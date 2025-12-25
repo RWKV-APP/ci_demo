@@ -14,6 +14,8 @@ class MainApp extends StatefulWidget {
   State<MainApp> createState() => _MainAppState();
 }
 
+// Trigger
+
 class _MainAppState extends State<MainApp> {
   String _version = "";
   String _buildNumber = "";

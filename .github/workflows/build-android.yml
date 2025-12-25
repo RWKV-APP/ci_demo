@@ -1,0 +1,58 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Convert local dependency to git dependency
+        run: |
+          # 将本地 path 依赖替换为 git 依赖
+          # 使用 perl 来处理多行替换
+          perl -i -pe 's|path: \.\./rwkv_mobile_flutter|git:\n    url: https://github.com/MollySophia/rwkv_mobile_flutter\n    ref: dev|' pubspec.yaml
+          # 移除注释符号
+          sed -i 's|# git:|git:|g' pubspec.yaml
+          sed -i 's|#   url:|  url:|g' pubspec.yaml
+          sed -i 's|#   ref:|  ref:|g' pubspec.yaml
+          # 显示修改后的内容以便调试
+          cat pubspec.yaml | grep -A 3 "rwkv_mobile_flutter"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify Flutter setup
+        run: flutter doctor -v
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+

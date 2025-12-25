@@ -26,6 +26,7 @@ jobs:
           repository: MollySophia/rwkv_mobile_flutter
           ref: dev
           path: rwkv_mobile_flutter
+          fetch-depth: 1
 
       - name: Setup Java
         uses: actions/setup-java@v4

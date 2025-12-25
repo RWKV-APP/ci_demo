@@ -104,6 +104,7 @@ jobs:
           $issContent | Out-File -FilePath "setup.iss" -Encoding ASCII
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 
+          # 这里的输出路径虽然包含反斜杠，但既然我们下面改用了通配符，这里仅作为日志检查即可，不影响上传
           $installerPath = Join-Path $outputDir $installerFilename
           if (Test-Path $installerPath) {
             echo "installer_path=$installerPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -115,4 +116,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: false
-          files: ${{ steps.create-installer.outputs.installer_path }}
+          # 修改点：使用正斜杠路径和通配符，确保能找到文件
+          files: build/windows/installer/*.exe

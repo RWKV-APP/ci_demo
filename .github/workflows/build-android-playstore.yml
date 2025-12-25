@@ -1,11 +1,11 @@
-name: Android aab
+name: Android Play Store
 
-run-name: ${{ github.ref_name }} Android Google Play Store
+run-name: ${{ github.ref_name }} Android Play Store
 
 on:
   push:
     tags:
-      - '[0-9]*' # 仅在打 tag 时触发
+      - '[0-9]*'
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-android-aab:
+  build-android-playstore:
     runs-on: ubuntu-latest
 
     steps:
@@ -62,28 +62,28 @@ jobs:
       - name: 🔐 Sign AAB with JKS
         run: |
           echo "::group::🔐 Signing AAB"
-          
+
           # 1. 从 Secret 恢复 JKS 文件
           mkdir -p android/app
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
           chmod 600 android/app/keystore.jks
-          
+
           # 2. 使用 jarsigner 签名 AAB
           AAB_PATH="build/app/outputs/bundle/release/app-release.aab"
-          
+
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
             -keystore android/app/keystore.jks \
             -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" \
             "$AAB_PATH" \
             "${{ secrets.ANDROID_KEY_ALIAS }}"
-          
+
           # 3. 验证签名
           jarsigner -verify -verbose -certs "$AAB_PATH" && echo "✅ AAB signed and verified successfully"
-          
+
           # 4. 清理 JKS 文件
           rm -f android/app/keystore.jks
-          
+
           echo "::endgroup::"
 
       - name: 📝 Rename aab File

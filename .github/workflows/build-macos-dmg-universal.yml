@@ -1,11 +1,11 @@
-name: macOS dmg
+name: macOS .dmg universal
 
-run-name: ${{ github.ref_name }} macOS .dmg
+run-name: ${{ github.ref_name }} macOS .dmg universal
 
 on:
   push:
     tags:
-      - '[0-9]*' # 仅在打 tag 时触发
+      - '[0-9]*'
   workflow_dispatch:
 
 concurrency:

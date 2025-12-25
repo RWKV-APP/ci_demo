@@ -1,12 +1,11 @@
-name: Android apk (arm64)
+name: Android apk arm64
 
-# 运行名称示例: "1.0.1 Android arm64 .apk"
-run-name: ${{ github.ref_name }} Android arm64 .apk
+run-name: ${{ github.ref_name }} Android apk arm64
 
 on:
   push:
     tags:
-      - '[0-9]*' # 仅在打 tag 时触发
+      - '[0-9]*'
   workflow_dispatch:
 
 concurrency:
@@ -94,23 +93,23 @@ jobs:
       - name: 🔐 Sign APK with JKS
         run: |
           echo "::group::🔐 Signing APK"
-          
+
           # 1. 从 Secret 恢复 JKS 文件
           mkdir -p android/app
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
           chmod 600 android/app/keystore.jks
-          
+
           # 2. 查找 Android SDK 路径
           ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           if [ -z "$ANDROID_SDK_ROOT" ]; then
             ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
           fi
-          
+
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
-          
+
           # 3. 尝试使用 apksigner（推荐方式，支持 v1+v2 签名）
           APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner 2>/dev/null | head -n 1)
-          
+
           if [ -n "$APKSIGNER" ]; then
             echo "✅ Using apksigner for signing"
             $APKSIGNER sign \
@@ -146,10 +145,10 @@ jobs:
             # 验证签名
             jarsigner -verify -verbose -certs "$APK_PATH" && echo "✅ APK signed and verified successfully"
           fi
-          
+
           # 4. 清理 JKS 文件
           rm -f android/app/keystore.jks
-          
+
           echo "::endgroup::"
 
       - name: 📝 Rename apk File

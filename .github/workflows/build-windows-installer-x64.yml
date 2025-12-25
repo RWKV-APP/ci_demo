@@ -140,6 +140,7 @@ jobs:
           $installerPath = Join-Path $outputDir $installerFilename
           if (Test-Path $installerPath) {
             echo "installer_path=$installerPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } else { exit 1 }
           echo "::endgroup::"
 
@@ -150,3 +151,14 @@ jobs:
           generate_release_notes: false
           # 修改点：使用正斜杠路径和通配符，确保能找到文件
           files: build/windows/installer/*.exe
+
+      - name: 📤 Upload to Tencent COS
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: sylingd/tencent-cos-and-cdn-action@v1
+        with:
+          secret_id: ${{ secrets.COS_SECRET_ID }}
+          secret_key: ${{ secrets.COS_SECRET_KEY }}
+          cos_bucket: ${{ secrets.COS_BUCKET }}
+          cos_region: ${{ secrets.COS_REGION }}
+          local_path: ${{ steps.create-installer.outputs.installer_path }}
+          remote_path: releases/${{ steps.create-installer.outputs.version }}/

@@ -100,6 +100,7 @@ jobs:
           Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipPath -Force
 
           echo "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           echo "::endgroup::"
 
       - name: Create GitHub Release
@@ -109,3 +110,14 @@ jobs:
           # ✅ 修复：不生成日志
           generate_release_notes: false
           files: ${{ steps.create-zip.outputs.zip_path }}
+
+      - name: 📤 Upload to Tencent COS
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: sylingd/tencent-cos-and-cdn-action@v1
+        with:
+          secret_id: ${{ secrets.COS_SECRET_ID }}
+          secret_key: ${{ secrets.COS_SECRET_KEY }}
+          cos_bucket: ${{ secrets.COS_BUCKET }}
+          cos_region: ${{ secrets.COS_REGION }}
+          local_path: ${{ steps.create-zip.outputs.zip_path }}
+          remote_path: releases/${{ steps.create-zip.outputs.version }}/

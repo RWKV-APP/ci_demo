@@ -50,7 +50,7 @@ jobs:
       - name: Verify Flutter setup
         run: flutter doctor -v
 
-      - name: Build macOS app
+      - name: Build macOS app (Universal)
         run: flutter build macos --release
 
       - name: 📦 Create DMG
@@ -87,14 +87,3 @@ jobs:
           generate_release_notes: true
           # 👇 确保这里使用的是 steps.create-dmg.outputs.dmg_path
           files: ${{ steps.create-dmg.outputs.dmg_path }}
-
-      # --- 以前是 upload-artifact，现在改成直接发 Release ---
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          # 自动把 Release Notes 填成 Git 的提交记录（可选）
-          generate_release_notes: true
-          # 把编译好的 macOS DMG 上传上去
-          files: build/macos/Build/Products/Release/ci_demo.dmg

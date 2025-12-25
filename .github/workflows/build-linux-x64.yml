@@ -1,6 +1,6 @@
-name: Build and Release Android AAB
+name: Build and Release Linux X64
 
-run-name: ${{ github.ref_name }} Android Google Play Store
+run-name: ${{ github.ref_name }} Linux X64
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-android-aab:
+  build-linux-x64:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,18 +31,23 @@ jobs:
           path: rwkv_mobile_flutter
           fetch-depth: 1
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           channel: 'stable'
           cache: true
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev
 
       - name: Override dependency path
         run: |
@@ -56,13 +61,13 @@ jobs:
       - name: Verify Flutter setup
         run: flutter doctor -v
 
-      - name: Build AAB (ARM64)
-        run: flutter build appbundle --release --target-platform android-arm64
+      - name: Build Linux X64
+        run: flutter build linux --release --target-platform linux-x64
 
-      - name: 📝 Rename AAB File
-        id: rename-aab
+      - name: 📦 Create Linux Archive
+        id: create-archive
         run: |
-          echo "::group::📝 Renaming AAB File"
+          echo "::group::📦 Creating Linux Archive"
 
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
@@ -70,25 +75,28 @@ jobs:
           if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
           if [ -z "$VERSION" ]; then echo "😡 Failed to extract version"; exit 1; fi
 
-          # 命名格式: rwkv_chat_1.0.0_1_android-arm64.aab
-          NEW_AAB_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_android-arm64.aab"
-          OLD_AAB_PATH="build/app/outputs/bundle/release/app-release.aab"
-          NEW_AAB_PATH="build/app/outputs/bundle/release/${NEW_AAB_NAME}"
+          # 命名格式: rwkv_chat_1.0.0_1_linux-x64.tar.gz
+          ARCHIVE_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_linux-x64.tar.gz"
 
-          mv "$OLD_AAB_PATH" "$NEW_AAB_PATH"
+          # 进入 bundle 目录打包，这样解压出来直接就是文件
+          cd build/linux/x64/release/bundle
+          tar -czf "$ARCHIVE_NAME" *
 
-          echo "aab_path=${NEW_AAB_PATH}" >> $GITHUB_OUTPUT
-          echo "aab_name=${NEW_AAB_NAME}" >> $GITHUB_OUTPUT
+          ARCHIVE_FULL_PATH="$(pwd)/$ARCHIVE_NAME"
+
+          echo "archive_path=$ARCHIVE_FULL_PATH" >> $GITHUB_OUTPUT
+          echo "archive_name=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "build_number=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
 
-          echo "✅ Renamed to: ${NEW_AAB_NAME}"
+          echo "✅ Archive created: $ARCHIVE_NAME"
           echo "::endgroup::"
+
+      # --- 以前是 upload-artifact，现在改成直接发 Release ---
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
-          # 把编译好的 AAB 上传上去（使用重命名后的文件）
-          files: ${{ steps.rename-aab.outputs.aab_path }}
+          # 👇 这里的 files 变干净了，只上传上面生成的那个压缩包
+          files: ${{ steps.create-archive.outputs.archive_path }}

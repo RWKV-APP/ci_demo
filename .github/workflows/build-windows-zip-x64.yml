@@ -1,6 +1,6 @@
-name: Build and Release Windows ZIP
+name: Build and Release Windows ZIP X64
 
-run-name: ${{ github.ref_name }} Windows .zip
+run-name: ${{ github.ref_name }} Windows ZIP X64
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-windows-zip:
+  build-windows-zip-x64:
     runs-on: windows-latest
 
     steps:
@@ -50,8 +50,8 @@ jobs:
       - name: Verify Flutter setup
         run: flutter doctor -v
 
-      - name: Build Windows
-        run: flutter build windows --release
+      - name: Build Windows X64
+        run: flutter build windows --release --target-platform windows-x64
 
       - name: Create ZIP archive
         id: create-zip

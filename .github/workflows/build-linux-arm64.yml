@@ -1,6 +1,6 @@
-name: Build and Release Linux
+name: Build and Release Linux ARM64
 
-run-name: ${{ github.ref_name }} Linux
+run-name: ${{ github.ref_name }} Linux ARM64
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
+  build-linux-arm64:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Linux dependencies
+      - name: Install Linux dependencies (ARM64)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -47,7 +47,9 @@ jobs:
             ninja-build \
             pkg-config \
             libgtk-3-dev \
-            liblzma-dev
+            liblzma-dev \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu
 
       - name: Override dependency path
         run: |
@@ -61,13 +63,13 @@ jobs:
       - name: Verify Flutter setup
         run: flutter doctor -v
 
-      - name: Build Linux
-        run: flutter build linux --release
+      - name: Build Linux ARM64
+        run: flutter build linux --release --target-platform linux-arm64
 
       - name: 📦 Create Linux Archive
         id: create-archive
         run: |
-          echo "::group::📦 Creating Linux Archive"
+          echo "::group::📦 Creating Linux ARM64 Archive"
 
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
@@ -75,11 +77,11 @@ jobs:
           if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
           if [ -z "$VERSION" ]; then echo "😡 Failed to extract version"; exit 1; fi
 
-          # 命名格式: rwkv_chat_1.0.0_1_linux-x64.tar.gz
-          ARCHIVE_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_linux-x64.tar.gz"
+          # 命名格式: rwkv_chat_1.0.0_1_linux-arm64.tar.gz
+          ARCHIVE_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_linux-arm64.tar.gz"
 
-          # 进入 bundle 目录打包，这样解压出来直接就是文件
-          cd build/linux/x64/release/bundle
+          # 进入 bundle 目录打包
+          cd build/linux/arm64/release/bundle
           tar -czf "$ARCHIVE_NAME" *
 
           ARCHIVE_FULL_PATH="$(pwd)/$ARCHIVE_NAME"
@@ -91,12 +93,10 @@ jobs:
           echo "✅ Archive created: $ARCHIVE_NAME"
           echo "::endgroup::"
 
-      # --- 以前是 upload-artifact，现在改成直接发 Release ---
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
-          # 👇 这里的 files 变干净了，只上传上面生成的那个压缩包
           files: ${{ steps.create-archive.outputs.archive_path }}
+

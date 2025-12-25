@@ -59,8 +59,8 @@ jobs:
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
 
-          # 命名格式: rwkv_chat_1.0.0_1_ios-universal.ipa
-          NEW_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_ios-universal.ipa"
+          # 命名格式: rwkv_chat_1.0.0_1_ios-arm64.ipa
+          NEW_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_ios-arm64.ipa"
 
           mv build/ios/ipa/*.ipa "build/ios/ipa/$NEW_NAME"
 
@@ -84,4 +84,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
-          files: build/ios/ipa/*.ipa
+          files: ${{ steps.rename-ipa.outputs.ipa_path }}

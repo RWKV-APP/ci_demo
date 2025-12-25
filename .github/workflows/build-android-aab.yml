@@ -2,58 +2,21 @@ name: Build and Release Android AAB
 
 run-name: ${{ github.ref_name }} Android Google Play Store
 
-# 临时禁用此 workflow，仅用于调试 build-android-apk.yml
 on:
   push:
-    # 禁用：使用一个永远不会匹配的 tag 模式
     tags:
-      - '__disabled__'
-  # workflow_dispatch:  # 已禁用
+      - '[0-9]*' # 仅在打 tag 时触发
+  workflow_dispatch:
 
 # 必须加上这个权限声明，否则 Action 没法创建 Release
 permissions:
   contents: write
-  actions: write
 
 jobs:
   build-android-aab:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Update run name
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const version = '${{ github.ref_name }}';
-            const system = 'Android';
-            const file = 'Google Play Store';
-            // 获取当前时间（东八区）
-            const now = new Date();
-            const formatter = new Intl.DateTimeFormat('en-US', {
-              timeZone: 'Asia/Shanghai',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false
-            });
-            const parts = formatter.formatToParts(now);
-            const month = parts.find(p => p.type === 'month').value;
-            const day = parts.find(p => p.type === 'day').value;
-            const hour = parts.find(p => p.type === 'hour').value;
-            const minute = parts.find(p => p.type === 'minute').value;
-            const dateTime = `${month}.${day} ${hour}:${minute}`;
-            const runName = `${version} ${system} ${file} ${dateTime}`;
-            
-            await github.rest.actions.updateWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-              name: runName
-            });
-            
-            console.log(`Updated run name to: ${runName}`);
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -103,4 +66,3 @@ jobs:
           generate_release_notes: true
           # 把编译好的 AAB 上传上去
           files: build/app/outputs/bundle/release/app-release.aab
-

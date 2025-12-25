@@ -184,16 +184,28 @@ jobs:
           generate_release_notes: false
           files: ${{ steps.rename-apk.outputs.apk_path }}
 
+      - name: 🛠️ Install Tencent COSCMD
+        if: startsWith(github.ref, 'refs/tags/')
+        run: pip install coscmd
+
       - name: 📤 Upload to Tencent COS
         if: startsWith(github.ref, 'refs/tags/')
-        uses: sylingd/tencent-cos-and-cdn-action@v1
-        with:
-          secret_id: ${{ secrets.COS_SECRET_ID }}
-          secret_key: ${{ secrets.COS_SECRET_KEY }}
-          cos_bucket: ${{ secrets.COS_BUCKET }}
-          cos_region: ${{ secrets.COS_REGION }}
-          local_path: ${{ steps.rename-apk.outputs.apk_path }}
-          remote_path: releases/${{ steps.rename-apk.outputs.version }}/
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+          LOCAL_FILE: ${{ steps.rename-apk.outputs.apk_path }}
+          REMOTE_FOLDER: releases/${{ steps.rename-apk.outputs.version }}/
+        run: |
+          echo "::group::📤 Uploading to Tencent COS"
+          # 配置 coscmd
+          coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "$COS_REGION"
+          # 执行上传
+          echo "Uploading $LOCAL_FILE to $REMOTE_FOLDER"
+          coscmd upload "$LOCAL_FILE" "$REMOTE_FOLDER"
+          echo "✅ Upload completed"
+          echo "::endgroup::"
 
       - name: 🎉 Build Summary
         if: success()

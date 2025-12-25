@@ -2,15 +2,15 @@ name: Build macOS App
 
 on:
   push:
-    branches: [ main, master, dev ]
+    branches: [main, master, dev]
   pull_request:
-    branches: [ main, master, dev ]
+    branches: [main, master, dev]
   workflow_dispatch:
 
 jobs:
   build-macos:
     runs-on: macos-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
         with:
           repository: MollySophia/rwkv_mobile_flutter
           ref: dev
-          path: ../rwkv_mobile_flutter
+          path: ./rwkv_mobile_flutter
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -52,4 +52,3 @@ jobs:
             build/macos/Build/Products/Release/ci_demo.app
             build/macos/Build/Products/Release/ci_demo.dmg
           retention-days: 30
-

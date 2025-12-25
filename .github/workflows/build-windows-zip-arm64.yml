@@ -1,6 +1,6 @@
-name: Build and Release Windows ZIP ARM64
+name: Windows zip arm64
 
-run-name: ${{ github.ref_name }} Windows ZIP ARM64
+run-name: ${{ github.ref_name }} Windows zip arm64
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Setup MSVC for ARM64 Cross-compilation
+      - name: Setup MSVC for arm64 Cross-compilation
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_arm64
@@ -53,14 +53,14 @@ jobs:
         run: flutter pub get
 
       # ✅ 修复：移除了 --target-platform
-      - name: Build Windows ARM64
+      - name: Build Windows arm64
         run: flutter build windows --release
 
-      - name: Create ZIP archive
+      - name: Create zip archive
         id: create-zip
         shell: pwsh
         run: |
-          echo "::group::📦 Creating ZIP Archive"
+          echo "::group::📦 Creating zip Archive"
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")

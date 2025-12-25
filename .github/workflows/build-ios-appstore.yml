@@ -1,4 +1,4 @@
-name: Build and Release iOS App Store
+name: iOS App Store
 
 run-name: ${{ github.ref_name }} iOS App Store
 

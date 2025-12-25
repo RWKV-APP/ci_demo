@@ -1,7 +1,7 @@
-name: Build and Release Android APK (ARM64)
+name: Android apk (arm64)
 
-# 运行名称示例: "1.0.1 Android ARM64 .apk"
-run-name: ${{ github.ref_name }} Android ARM64 .apk
+# 运行名称示例: "1.0.1 Android arm64 .apk"
+run-name: ${{ github.ref_name }} Android arm64 .apk
 
 on:
   push:
@@ -74,9 +74,9 @@ jobs:
       - name: 🔍 Verify Flutter Setup
         run: flutter doctor -v
 
-      - name: 🏗️ Build APK (Release - ARM64 Only)
+      - name: 🏗️ Build apk (Release - arm64 Only)
         run: |
-          echo "::notice title=Build Started::Building release APK for Android (ARM64)..."
+          echo "::notice title=Build Started::Building release apk for Android (arm64)..."
 
           # 👇 显式指定只构建 android-arm64
           flutter build apk --release --target-platform android-arm64
@@ -84,17 +84,17 @@ jobs:
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           if [ -f "$APK_PATH" ]; then
             APK_SIZE=$(ls -lh "$APK_PATH" | awk '{print $5}')
-            echo "::notice title=Build Success::APK built successfully! Size: $APK_SIZE"
-            echo "✅ APK location: $APK_PATH"
+            echo "::notice title=Build Success::apk built successfully! Size: $APK_SIZE"
+            echo "✅ apk location: $APK_PATH"
           else
-            echo "::error title=Build Failed::APK file not found!"
+            echo "::error title=Build Failed::apk file not found!"
             exit 1
           fi
 
-      - name: 📝 Rename APK File
+      - name: 📝 Rename apk File
         id: rename-apk
         run: |
-          echo "::group::📝 Renaming APK File"
+          echo "::group::📝 Renaming apk File"
 
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')

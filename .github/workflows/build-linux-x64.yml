@@ -1,6 +1,6 @@
-name: Build and Release Linux X64
+name: Linux x64
 
-run-name: ${{ github.ref_name }} Linux X64
+run-name: ${{ github.ref_name }} Linux x64
 
 on:
   push:
@@ -61,7 +61,7 @@ jobs:
       - name: Verify Flutter setup
         run: flutter doctor -v
 
-      - name: Build Linux X64
+      - name: Build Linux x64
         run: flutter build linux --release --target-platform linux-x64
 
       - name: 📦 Create Linux Archive

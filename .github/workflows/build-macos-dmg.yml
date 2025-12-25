@@ -1,4 +1,4 @@
-name: Build and Release macOS DMG
+name: macOS dmg
 
 run-name: ${{ github.ref_name }} macOS .dmg
 
@@ -53,10 +53,10 @@ jobs:
       - name: Build macOS app (Universal)
         run: flutter build macos --release
 
-      - name: 📦 Create DMG
+      - name: 📦 Create dmg
         id: create-dmg
         run: |
-          echo "::group::📦 Creating DMG"
+          echo "::group::📦 Creating dmg"
 
           # 1. 提取版本号
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
@@ -68,7 +68,7 @@ jobs:
 
           cd build/macos/Build/Products/Release
 
-          # 2. 创建 DMG (使用提取出的名字)
+          # 2. 创建 dmg (使用提取出的名字)
           hdiutil create -volname "RWKV_Chat" -srcfolder "ci_demo.app" -ov -format UDZO "$DMG_NAME"
 
           DMG_PATH="$(pwd)/$DMG_NAME"
@@ -77,7 +77,7 @@ jobs:
           echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          echo "✅ DMG created: $DMG_NAME"
+          echo "✅ dmg created: $DMG_NAME"
           echo "::endgroup::"
 
       - name: Create GitHub Release

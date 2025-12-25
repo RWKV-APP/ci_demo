@@ -1,6 +1,6 @@
-name: Build and Release Windows ZIP X64
+name: Windows zip x64
 
-run-name: ${{ github.ref_name }} Windows ZIP X64
+run-name: ${{ github.ref_name }} Windows zip x64
 
 on:
   push:
@@ -48,14 +48,14 @@ jobs:
         run: flutter pub get
 
       # ✅ 修复：移除了 --target-platform
-      - name: Build Windows X64
+      - name: Build Windows x64
         run: flutter build windows --release
 
-      - name: Create ZIP archive
+      - name: Create zip archive
         id: create-zip
         shell: pwsh
         run: |
-          echo "::group::📦 Creating ZIP Archive"
+          echo "::group::📦 Creating zip Archive"
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")

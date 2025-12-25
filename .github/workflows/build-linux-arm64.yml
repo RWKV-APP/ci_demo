@@ -1,6 +1,6 @@
-name: Build and Release Linux ARM64
+name: Linux arm64
 
-run-name: ${{ github.ref_name }} Linux ARM64
+run-name: ${{ github.ref_name }} Linux arm64
 
 on:
   push:
@@ -33,8 +33,8 @@ jobs:
 
       # ❌ 删除了普通的 Setup Flutter，改用下面的 QEMU 模拟器
 
-      # 👇 核心步骤：启动 ARM64 模拟器环境进行构建
-      - name: 🏗️ Build in ARM64 Emulator
+      # 👇 核心步骤：启动 arm64 模拟器环境进行构建
+      - name: 🏗️ Build in arm64 Emulator
         uses: uraimo/run-on-arch-action@v2
         id: build
         with:
@@ -42,7 +42,7 @@ jobs:
           distro: ubuntu22.04
           githubToken: ${{ github.token }}
 
-          # 1. 在容器内安装 ARM64 依赖 (注意：这里安装的是真正的 arm64 库)
+          # 1. 在容器内安装 arm64 依赖 (注意：这里安装的是真正的 arm64 库)
           install: |
             apt-get update -q -y
             apt-get install -q -y \
@@ -52,8 +52,8 @@ jobs:
 
           # 2. 运行构建脚本
           run: |
-            # --- 安装 Flutter (ARM64 版本) ---
-            echo "⬇️ Downloading Flutter (ARM64)..."
+            # --- 安装 Flutter (arm64 版本) ---
+            echo "⬇️ Downloading Flutter (arm64)..."
             git clone https://github.com/flutter/flutter.git --depth 1 -b stable /opt/flutter
             export PATH="/opt/flutter/bin:$PATH"
 
@@ -70,8 +70,8 @@ jobs:
             echo "🧶 Pub get..."
             flutter pub get
 
-            echo "🏗️ Building Linux ARM64..."
-            # 在 ARM64 环境下，不需要 --target-platform 参数，直接 build 就是 arm64
+            echo "🏗️ Building Linux arm64..."
+            # 在 arm64 环境下，不需要 --target-platform 参数，直接 build 就是 arm64
             flutter build linux --release
 
             # --- 打包和重命名 ---

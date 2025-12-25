@@ -1,6 +1,6 @@
-name: Build and Release Windows Installer ARM64
+name: Windows Installer arm64
 
-run-name: ${{ github.ref_name }} Windows Installer ARM64
+run-name: ${{ github.ref_name }} Windows Installer arm64
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Setup MSVC for ARM64 Cross-compilation
+      - name: Setup MSVC for arm64 Cross-compilation
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_arm64
@@ -57,7 +57,7 @@ jobs:
         run: flutter pub get
 
       # ✅ 修复：移除了 --target-platform (MSVC 环境会自动处理)
-      - name: Build Windows ARM64
+      - name: Build Windows arm64
         run: flutter build windows --release
 
       - name: 📦 Create Installer (Inno Setup)

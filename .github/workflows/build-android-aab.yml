@@ -1,4 +1,4 @@
-name: Build and Release Android AAB
+name: Android aab
 
 run-name: ${{ github.ref_name }} Android Google Play Store
 
@@ -56,13 +56,13 @@ jobs:
       - name: Verify Flutter setup
         run: flutter doctor -v
 
-      - name: Build AAB (ARM64)
+      - name: Build aab (arm64)
         run: flutter build appbundle --release --target-platform android-arm64
 
-      - name: 📝 Rename AAB File
+      - name: 📝 Rename aab File
         id: rename-aab
         run: |
-          echo "::group::📝 Renaming AAB File"
+          echo "::group::📝 Renaming aab File"
 
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
@@ -90,5 +90,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: false
-          # 把编译好的 AAB 上传上去（使用重命名后的文件）
+          # 把编译好的 aab 上传上去（使用重命名后的文件）
           files: ${{ steps.rename-aab.outputs.aab_path }}

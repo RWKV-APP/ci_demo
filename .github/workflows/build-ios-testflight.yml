@@ -1,4 +1,4 @@
-name: Build and Release iOS TestFlight
+name: iOS TestFlight
 
 run-name: ${{ github.ref_name }} iOS TestFlight
 

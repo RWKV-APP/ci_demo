@@ -2,13 +2,13 @@ name: Build and Release macOS DMG
 
 run-name: ${{ github.ref_name }} macOS .dmg
 
+# 临时禁用此 workflow，仅用于调试 build-android-apk.yml
 on:
   push:
-    # 只有当你打的 tag 是以数字开头时（如 1.0.0, 1.1.0）才触发这个流程
+    # 禁用：使用一个永远不会匹配的 tag 模式
     tags:
-      - '[0-9]*'
-  # 也可以保留手动触发方便测试
-  workflow_dispatch:
+      - '__disabled__'
+  # workflow_dispatch:  # 已禁用
 
 # 必须加上这个权限声明，否则 Action 没法创建 Release
 permissions:

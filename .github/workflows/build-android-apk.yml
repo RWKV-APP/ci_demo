@@ -20,19 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 清理空间
-      - name: 🧹 Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: false
-          tool-cache: false
-          dotnet: true
-          haskell: true
-          swap-storage: true
-          docker-images: true
-          large-packages: true
-
-      # 2. 更新运行名称
+      # 1. 更新运行名称
       - name: 🏷️ Update Run Name
         uses: actions/github-script@v7
         with:
@@ -40,6 +28,7 @@ jobs:
             const version = '${{ github.ref_name }}';
             const system = 'Android';
             const file = '.apk';
+
             // 获取当前时间（东八区）
             const now = new Date();
             const formatter = new Intl.DateTimeFormat('en-US', {
@@ -55,10 +44,12 @@ jobs:
             const day = parts.find(p => p.type === 'day').value;
             const hour = parts.find(p => p.type === 'hour').value;
             const minute = parts.find(p => p.type === 'minute').value;
+
             const dateTime = `${month}.${day} ${hour}:${minute}`;
             const runName = `${version} ${system} ${file} ${dateTime}`;
 
-            await github.rest.actions.updateWorkflowRun({
+            // ⚠️ 修改处：使用 github.request 直接调用 API 接口
+            await github.request('PATCH /repos/{owner}/{repo}/actions/runs/{run_id}', {
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: context.runId,
@@ -66,6 +57,18 @@ jobs:
             });
 
             console.log(`✅ Updated run name to: ${runName}`);
+
+      # 2. 清理空间
+      - name: 🧹 Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          tool-cache: false
+          dotnet: true
+          haskell: true
+          swap-storage: true
+          docker-images: true
+          large-packages: true
 
       # 3. 拉取代码
       - name: 📥 Checkout main repo

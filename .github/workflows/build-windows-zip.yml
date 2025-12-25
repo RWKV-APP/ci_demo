@@ -2,13 +2,13 @@ name: Build and Release Windows ZIP
 
 run-name: ${{ github.ref_name }} Windows .zip
 
+# 临时禁用此 workflow，仅用于调试 build-android-apk.yml
 on:
   push:
-    # 只有当你打的 tag 是以数字开头时（如 1.0.0, 1.1.0）才触发这个流程
+    # 禁用：使用一个永远不会匹配的 tag 模式
     tags:
-      - '[0-9]*'
-  # 也可以保留手动触发方便测试
-  workflow_dispatch:
+      - '__disabled__'
+  # workflow_dispatch:  # 已禁用
 
 # 必须加上这个权限声明，否则 Action 没法创建 Release
 permissions:
@@ -44,14 +44,14 @@ jobs:
             const minute = parts.find(p => p.type === 'minute').value;
             const dateTime = `${month}.${day} ${hour}:${minute}`;
             const runName = `${version} ${system} ${file} ${dateTime}`;
-            
+
             await github.rest.actions.updateWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: context.runId,
               name: runName
             });
-            
+
             console.log(`Updated run name to: ${runName}`);
 
       - name: Checkout repository
@@ -92,54 +92,54 @@ jobs:
         shell: pwsh
         run: |
           echo "::group::📦 Creating ZIP Archive"
-          
+
           # 从 pubspec.yaml 中提取版本号和构建号
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")
-          
+
           if ([string]::IsNullOrEmpty($buildNumber)) {
             $buildNumber = "1"
             echo "🚧 Build number not found, using default: 1"
           }
-          
+
           if ([string]::IsNullOrEmpty($version)) {
             echo "😡 Failed to extract version from pubspec.yaml"
             exit 1
           }
-          
+
           # 生成 ZIP 文件名：rwkv_chat_版本号_构建号.zip
           $zipName = "rwkv_chat_${version}_${buildNumber}.zip"
           $sourceDir = "build/windows/x64/runner/Release"
           $zipPath = "build/windows/x64/runner/$zipName"
-          
+
           # 检查源目录是否存在
           if (-not (Test-Path $sourceDir)) {
             echo "😡 Source directory not found: $sourceDir"
             exit 1
           }
-          
+
           # 创建 ZIP 文件
           Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipPath -Force
-          
+
           # 验证 ZIP 文件是否创建成功
           if (-not (Test-Path $zipPath)) {
             echo "😡 Failed to create ZIP file"
             exit 1
           }
-          
+
           $zipSize = (Get-Item $zipPath).Length / 1MB
           echo "✅ ZIP created: $zipName"
           echo "📦 Version: $version"
           echo "🔢 Build Number: $buildNumber"
           echo "📊 Size: $([math]::Round($zipSize, 2)) MB"
-          
+
           # 设置输出变量
           echo "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           echo "zip_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           echo "build_number=$buildNumber" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          
+
           echo "::endgroup::"
 
       # --- 以前是 upload-artifact，现在改成直接发 Release ---
@@ -152,4 +152,3 @@ jobs:
           generate_release_notes: true
           # 把编译好的 Windows ZIP 上传上去（使用重命名后的文件）
           files: ${{ steps.create-zip.outputs.zip_path }}
-

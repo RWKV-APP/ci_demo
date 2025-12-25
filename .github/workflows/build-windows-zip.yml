@@ -8,7 +8,10 @@ on:
       - '[0-9]*' # 仅在打 tag 时触发
   workflow_dispatch:
 
-# 必须加上这个权限声明，否则 Action 没法创建 Release
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 

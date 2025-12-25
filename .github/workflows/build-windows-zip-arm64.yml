@@ -55,6 +55,40 @@ jobs:
       - name: Build Windows arm64
         run: flutter build windows --release
 
+      - name: 🧹 Remove x64 DLLs
+        shell: pwsh
+        run: |
+          echo "::group::🧹 Cleaning up x64 DLLs"
+          if (Test-Path "build/windows/arm64/runner/Release") {
+            $sourceDir = "build/windows/arm64/runner/Release"
+          } else {
+            $sourceDir = "build/windows/runner/Release"
+          }
+          if (Test-Path $sourceDir) {
+            # 删除 x64 相关的 DLL 文件（如果存在）
+            $filesToRemove = @(
+              "*x64*.dll",
+              "libomp140.x86_64.dll"
+            )
+            $removedCount = 0
+            foreach ($pattern in $filesToRemove) {
+              $files = Get-ChildItem -Path $sourceDir -Filter $pattern -ErrorAction SilentlyContinue
+              foreach ($file in $files) {
+                Remove-Item -Path $file.FullName -Force
+                Write-Host "✅ Removed: $($file.Name)"
+                $removedCount++
+              }
+            }
+            if ($removedCount -eq 0) {
+              Write-Host "ℹ️ No x64 DLLs found to remove"
+            } else {
+              Write-Host "✅ Removed $removedCount x64 DLL file(s)"
+            }
+          } else {
+            Write-Host "🚧 Source directory not found: $sourceDir"
+          }
+          echo "::endgroup::"
+
       - name: Create zip archive
         id: create-zip
         shell: pwsh

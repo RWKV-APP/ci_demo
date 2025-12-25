@@ -54,6 +54,38 @@ jobs:
       - name: Build Windows x64
         run: flutter build windows --release
 
+      - name: 🧹 Remove arm64/aarch64 DLLs
+        shell: pwsh
+        run: |
+          echo "::group::🧹 Cleaning up arm64/aarch64 DLLs"
+          $sourceDir = "build\windows\x64\runner\Release"
+          if (Test-Path $sourceDir) {
+            # 删除 arm64/aarch64 相关的 DLL 文件
+            $filesToRemove = @(
+              "*arm64*.dll",
+              "*aarch64*.dll",
+              "libomp140.aarch64.dll",
+              "rwkv_mobile-arm64.dll"
+            )
+            $removedCount = 0
+            foreach ($pattern in $filesToRemove) {
+              $files = Get-ChildItem -Path $sourceDir -Filter $pattern -ErrorAction SilentlyContinue
+              foreach ($file in $files) {
+                Remove-Item -Path $file.FullName -Force
+                Write-Host "✅ Removed: $($file.Name)"
+                $removedCount++
+              }
+            }
+            if ($removedCount -eq 0) {
+              Write-Host "ℹ️ No arm64/aarch64 DLLs found to remove"
+            } else {
+              Write-Host "✅ Removed $removedCount arm64/aarch64 DLL file(s)"
+            }
+          } else {
+            Write-Host "🚧 Source directory not found: $sourceDir"
+          }
+          echo "::endgroup::"
+
       - name: 📦 Create Installer (Inno Setup)
         id: create-installer
         shell: pwsh

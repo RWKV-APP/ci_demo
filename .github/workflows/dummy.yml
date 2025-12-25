@@ -1,7 +1,7 @@
 name: Dummy Debugger
 
 # 运行名称示例: "🔍 Debug v1.0.0"
-run-name: 🔍 Debug ${{ github.ref_name }}
+run-name: ${{ github.ref_name }} 🔍 Debug
 
 on:
   push:

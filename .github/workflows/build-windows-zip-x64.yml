@@ -83,13 +83,10 @@ jobs:
           echo "✅ Created: $zipName"
           echo "::endgroup::"
 
-      # --- 以前是 upload-artifact，现在改成直接发 Release ---
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          # 自动把 Release Notes 填成 Git 的提交记录（可选）
           generate_release_notes: true
-          # 把编译好的 Windows ZIP 上传上去（使用重命名后的文件）
+          # 把编译好的 Windows ZIP 上传上去
           files: ${{ steps.create-zip.outputs.zip_path }}

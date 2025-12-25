@@ -38,11 +38,17 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # 👇 关键步骤：设置 MSVC 交叉编译环境 (x64 -> arm64)
+      - name: Setup MSVC for ARM64 Cross-compilation
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+
       # 👇 新增步骤：安装 Inno Setup 编译器
       - name: 💿 Install Inno Setup
         shell: pwsh
         run: |
-          choco install innosetup
+          choco install innosetup --yes
 
       - name: Override dependency path
         run: |

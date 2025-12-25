@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-windows-arm64:
+  build-windows-zip-arm64:
     runs-on: windows-latest
 
     steps:

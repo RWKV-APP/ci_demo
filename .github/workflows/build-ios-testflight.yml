@@ -56,15 +56,33 @@ jobs:
       - name: 📝 Rename IPA
         id: rename-ipa
         run: |
+          echo "::group::📝 Renaming IPA File"
+
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+
+          if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
+          if [ -z "$VERSION" ]; then echo "😡 Failed to extract version"; exit 1; fi
 
           # 命名格式: rwkv_chat_1.0.0_1_ios-arm64.ipa
           NEW_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_ios-arm64.ipa"
 
-          mv build/ios/ipa/*.ipa "build/ios/ipa/$NEW_NAME"
+          # 检查 IPA 文件是否存在
+          IPA_FILE=$(ls build/ios/ipa/*.ipa 2>/dev/null | head -n 1)
+          if [ -z "$IPA_FILE" ] || [ ! -f "$IPA_FILE" ]; then
+            echo "😡 IPA file not found!"
+            exit 1
+          fi
+
+          mv "$IPA_FILE" "build/ios/ipa/$NEW_NAME"
 
           echo "ipa_path=build/ios/ipa/$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "ipa_name=$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+          echo "✅ Renamed to: $NEW_NAME"
+          echo "::endgroup::"
 
       # --- 上传到 TestFlight 需要额外的配置和证书 ---
       # 这里需要配置 App Store Connect API Key 和证书

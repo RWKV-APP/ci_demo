@@ -42,7 +42,7 @@ jobs:
       - name: 💿 Install Inno Setup
         shell: pwsh
         run: |
-          choco install innosetup
+          choco install innosetup --yes
 
       - name: Override dependency path
         run: |

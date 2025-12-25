@@ -91,6 +91,67 @@ jobs:
             exit 1
           fi
 
+      - name: 🔐 Sign APK with JKS
+        run: |
+          echo "::group::🔐 Signing APK"
+          
+          # 1. 从 Secret 恢复 JKS 文件
+          mkdir -p android/app
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          chmod 600 android/app/keystore.jks
+          
+          # 2. 查找 Android SDK 路径
+          ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          if [ -z "$ANDROID_SDK_ROOT" ]; then
+            ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+          fi
+          
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          
+          # 3. 尝试使用 apksigner（推荐方式，支持 v1+v2 签名）
+          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner 2>/dev/null | head -n 1)
+          
+          if [ -n "$APKSIGNER" ]; then
+            echo "✅ Using apksigner for signing"
+            $APKSIGNER sign \
+              --ks android/app/keystore.jks \
+              --ks-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+              --key-pass pass:"${{ secrets.ANDROID_KEY_PASSWORD }}" \
+              --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+              --out "${APK_PATH}.signed" \
+              "$APK_PATH"
+            
+            mv "${APK_PATH}.signed" "$APK_PATH"
+            
+            # 验证签名
+            $APKSIGNER verify "$APK_PATH" && echo "✅ APK signed and verified successfully"
+          else
+            # 备用方案：使用 jarsigner
+            echo "⚠️ apksigner not found, using jarsigner instead"
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore android/app/keystore.jks \
+              -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+              -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" \
+              "$APK_PATH" \
+              "${{ secrets.ANDROID_KEY_ALIAS }}"
+            
+            # 对齐 APK（zipalign）
+            ZIPALIGN=$(find "$ANDROID_SDK_ROOT/build-tools" -name zipalign 2>/dev/null | head -n 1)
+            if [ -n "$ZIPALIGN" ]; then
+              mv "$APK_PATH" "${APK_PATH}.unsigned"
+              $ZIPALIGN -v 4 "${APK_PATH}.unsigned" "$APK_PATH"
+              rm "${APK_PATH}.unsigned"
+            fi
+            
+            # 验证签名
+            jarsigner -verify -verbose -certs "$APK_PATH" && echo "✅ APK signed and verified successfully"
+          fi
+          
+          # 4. 清理 JKS 文件
+          rm -f android/app/keystore.jks
+          
+          echo "::endgroup::"
+
       - name: 📝 Rename apk File
         id: rename-apk
         run: |

@@ -3,9 +3,9 @@ name: Windows zip arm64
 run-name: ${{ github.ref_name }} Windows zip arm64
 
 on:
-  push:
-    tags:
-      - '[0-9]*'
+  # push:
+  #   tags:
+  #     - '[0-9]*'
   workflow_dispatch:
 
 concurrency:
@@ -52,7 +52,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ✅ 修复：移除了 --target-platform
       - name: Build Windows arm64
         run: flutter build windows --release
 

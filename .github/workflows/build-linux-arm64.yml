@@ -3,9 +3,9 @@ name: Linux arm64
 run-name: ${{ github.ref_name }} Linux arm64
 
 on:
-  push:
-    tags:
-      - '[0-9]*'
+  # push:
+  #   tags:
+  #     - '[0-9]*'
   workflow_dispatch:
 
 concurrency:

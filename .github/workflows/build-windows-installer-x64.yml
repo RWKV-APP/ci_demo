@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-windows-zip-x64:
+  build-windows-installer-x64:
     runs-on: windows-latest
 
     steps:
@@ -38,6 +38,10 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: 💿 Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes
+
       - name: Override dependency path
         run: |
           echo "dependency_overrides:" > pubspec_overrides.yaml
@@ -47,34 +51,68 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ✅ 修复：移除了 --target-platform
       - name: Build Windows x64
         run: flutter build windows --release
 
-      - name: Create zip archive
-        id: create-zip
+      - name: 📦 Create Installer (Inno Setup)
+        id: create-installer
         shell: pwsh
         run: |
-          echo "::group::📦 Creating zip Archive"
+          echo "::group::📦 Creating Windows Installer"
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")
           if ([string]::IsNullOrEmpty($buildNumber)) { $buildNumber = "1" }
 
-          $zipName = "rwkv_chat_${version}_${buildNumber}_windows-x64.zip"
-          $sourceDir = "build/windows/x64/runner/Release"
-          $zipPath = "build/windows/x64/runner/$zipName"
+          $installerName = "rwkv_chat_${version}_${buildNumber}_windows-x64-setup"
+          $installerFilename = "$installerName.exe"
+          $sourceDir = "build\windows\x64\runner\Release"
+          $outputDir = "build\windows\installer"
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-          if (-not (Test-Path $sourceDir)) { echo "😡 Source not found"; exit 1 }
-          Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipPath -Force
+          $issContent = @"
+          [Setup]
+          AppId={{B8263530-8329-4360-844C-964687593675}
+          AppName=RWKV Chat
+          AppVersion=$version
+          AppPublisher=RWKV Community
+          DefaultDirName={autopf}\RWKV Chat
+          DisableProgramGroupPage=yes
+          OutputDir=$outputDir
+          OutputBaseFilename=$installerName
+          Compression=lzma
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64
 
-          echo "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+          [Files]
+          Source: "$sourceDir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{autoprograms}\RWKV Chat"; Filename: "{app}\ci_demo.exe"
+          Name: "{autodesktop}\RWKV Chat"; Filename: "{app}\ci_demo.exe"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\ci_demo.exe"; Description: "{cm:LaunchProgram,RWKV Chat}"; Flags: nowait postinstall skipifsilent
+          "@
+
+          $issContent | Out-File -FilePath "setup.iss" -Encoding ASCII
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+          $installerPath = Join-Path $outputDir $installerFilename
+          if (Test-Path $installerPath) {
+            echo "installer_path=$installerPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else { exit 1 }
           echo "::endgroup::"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          # ✅ 修复：不生成日志
           generate_release_notes: false
-          files: ${{ steps.create-zip.outputs.zip_path }}
+          files: ${{ steps.create-installer.outputs.installer_path }}

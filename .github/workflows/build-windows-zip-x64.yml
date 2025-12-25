@@ -47,7 +47,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ✅ 修复：移除了 --target-platform
       - name: Build Windows x64
         run: flutter build windows --release
 

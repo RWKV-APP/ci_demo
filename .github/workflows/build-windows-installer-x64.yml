@@ -1,6 +1,6 @@
-name: Build and Release Windows Installer X64
+name: Build and Release Windows ZIP X64
 
-run-name: ${{ github.ref_name }} Windows Installer X64
+run-name: ${{ github.ref_name }} Windows ZIP X64
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build-windows-installer-x64:
+  build-windows-zip-x64:
     runs-on: windows-latest
 
     steps:
@@ -38,12 +38,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 👇 新增步骤：安装 Inno Setup 编译器
-      - name: 💿 Install Inno Setup
-        shell: pwsh
-        run: |
-          choco install innosetup --yes
-
       - name: Override dependency path
         run: |
           echo "dependency_overrides:" > pubspec_overrides.yaml
@@ -53,100 +47,34 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify Flutter setup
-        run: flutter doctor -v
-
+      # ✅ 修复：移除了 --target-platform
       - name: Build Windows X64
-        run: flutter build windows --release --target-platform windows-x64
+        run: flutter build windows --release
 
-      # 👇 核心修改：生成 ISS 脚本并编译成 EXE
-      - name: 📦 Create Installer (Inno Setup)
-        id: create-installer
+      - name: Create ZIP archive
+        id: create-zip
         shell: pwsh
         run: |
-          echo "::group::📦 Creating Windows Installer"
-
-          # 1. 提取版本信息
+          echo "::group::📦 Creating ZIP Archive"
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")
           if ([string]::IsNullOrEmpty($buildNumber)) { $buildNumber = "1" }
 
-          # 2. 定义路径和名称
-          # 命名格式: rwkv_chat_1.0.0_1_windows-x64-setup.exe
-          $installerName = "rwkv_chat_${version}_${buildNumber}_windows-x64-setup"
-          $installerFilename = "$installerName.exe"
+          $zipName = "rwkv_chat_${version}_${buildNumber}_windows-x64.zip"
+          $sourceDir = "build/windows/x64/runner/Release"
+          $zipPath = "build/windows/x64/runner/$zipName"
 
-          $sourceDir = "build\windows\x64\runner\Release"
-          $outputDir = "build\windows\installer"
+          if (-not (Test-Path $sourceDir)) { echo "😡 Source not found"; exit 1 }
+          Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipPath -Force
 
-          # 创建输出目录
-          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-
-          # 3. 动态生成 Inno Setup 脚本 (setup.iss)
-          # 这里定义了安装向导的各种参数
-          $issContent = @"
-          [Setup]
-          AppId={{B8263530-8329-4360-844C-964687593675}
-          AppName=RWKV Chat
-          AppVersion=$version
-          AppPublisher=RWKV Community
-          DefaultDirName={autopf}\RWKV Chat
-          DisableProgramGroupPage=yes
-          OutputDir=$outputDir
-          OutputBaseFilename=$installerName
-          Compression=lzma
-          SolidCompression=yes
-          ArchitecturesInstallIn64BitMode=x64
-
-          [Languages]
-          Name: "english"; MessagesFile: "compiler:Default.isl"
-
-          [Tasks]
-          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-
-          [Files]
-          ; 把 Release 目录下的所有文件打包进去
-          Source: "$sourceDir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-          [Icons]
-          Name: "{autoprograms}\RWKV Chat"; Filename: "{app}\ci_demo.exe"
-          Name: "{autodesktop}\RWKV Chat"; Filename: "{app}\ci_demo.exe"; Tasks: desktopicon
-
-          [Run]
-          Filename: "{app}\ci_demo.exe"; Description: "{cm:LaunchProgram,RWKV Chat}"; Flags: nowait postinstall skipifsilent
-          "@
-
-          # 将内容写入 setup.iss 文件
-          $issContent | Out-File -FilePath "setup.iss" -Encoding ASCII
-
-          echo "📝 Generated setup.iss content:"
-          Get-Content setup.iss | Select-Object -First 10
-
-          # 4. 运行 Inno Setup 编译器 (ISCC)
-          echo "🚀 Running Inno Setup Compiler..."
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
-
-          # 5. 验证并输出
-          $installerPath = Join-Path $outputDir $installerFilename
-
-          if (Test-Path $installerPath) {
-             echo "✅ Installer created successfully: $installerPath"
-             
-             echo "installer_path=$installerPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-             echo "installer_name=$installerFilename" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-             echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          } else {
-             echo "😡 Installer creation failed!"
-             exit 1
-          }
-
+          echo "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           echo "::endgroup::"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
-          # 上传生成的 .exe 文件
-          files: ${{ steps.create-installer.outputs.installer_path }}
+          # ✅ 修复：不生成日志
+          generate_release_notes: false
+          files: ${{ steps.create-zip.outputs.zip_path }}

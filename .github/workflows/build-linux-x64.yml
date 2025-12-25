@@ -95,6 +95,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
+          generate_release_notes: false
           # 👇 这里的 files 变干净了，只上传上面生成的那个压缩包
           files: ${{ steps.create-archive.outputs.archive_path }}

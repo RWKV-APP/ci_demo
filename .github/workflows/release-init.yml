@@ -1,0 +1,24 @@
+name: 0. Initialize Release
+
+run-name: ${{ github.ref_name }} Setup Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  init-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # ✅ 只有这里开启日志生成
+          generate_release_notes: true
+          # 设为 draft 可以避免用户在文件没传完时下载，确认无误后手动发布（可选）
+          # draft: true
+          # prerelease: false

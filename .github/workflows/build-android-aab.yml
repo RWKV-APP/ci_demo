@@ -89,6 +89,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
+          generate_release_notes: false
           # 把编译好的 AAB 上传上去（使用重命名后的文件）
           files: ${{ steps.rename-aab.outputs.aab_path }}

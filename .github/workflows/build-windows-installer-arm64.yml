@@ -38,17 +38,14 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 👇 关键步骤：设置 MSVC 交叉编译环境 (x64 -> arm64)
       - name: Setup MSVC for ARM64 Cross-compilation
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_arm64
 
-      # 👇 新增步骤：安装 Inno Setup 编译器
       - name: 💿 Install Inno Setup
         shell: pwsh
-        run: |
-          choco install innosetup --yes
+        run: choco install innosetup --yes
 
       - name: Override dependency path
         run: |
@@ -59,43 +56,31 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify Flutter setup
-        run: flutter doctor -v
-
+      # ✅ 修复：移除了 --target-platform (MSVC 环境会自动处理)
       - name: Build Windows ARM64
-        run: flutter build windows --release --target-platform windows-arm64
+        run: flutter build windows --release
 
-      # 👇 核心修改：生成 ISS 脚本并编译成 EXE
       - name: 📦 Create Installer (Inno Setup)
         id: create-installer
         shell: pwsh
         run: |
           echo "::group::📦 Creating Windows Installer"
-
-          # 1. 提取版本信息
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")
           if ([string]::IsNullOrEmpty($buildNumber)) { $buildNumber = "1" }
 
-          # 2. 定义路径和名称
-          # 命名格式: rwkv_chat_1.0.0_1_windows-arm64-setup.exe
           $installerName = "rwkv_chat_${version}_${buildNumber}_windows-arm64-setup"
           $installerFilename = "$installerName.exe"
 
-          # ARM64 构建可能在不同路径
           if (Test-Path "build\windows\arm64\runner\Release") {
             $sourceDir = "build\windows\arm64\runner\Release"
           } else {
             $sourceDir = "build\windows\runner\Release"
           }
           $outputDir = "build\windows\installer"
-
-          # 创建输出目录
           New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-          # 3. 动态生成 Inno Setup 脚本 (setup.iss)
-          # 这里定义了安装向导的各种参数
           $issContent = @"
           [Setup]
           AppId={{B8263530-8329-4360-844C-964687593675}
@@ -117,7 +102,6 @@ jobs:
           Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
           [Files]
-          ; 把 Release 目录下的所有文件打包进去
           Source: "$sourceDir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
@@ -128,36 +112,19 @@ jobs:
           Filename: "{app}\ci_demo.exe"; Description: "{cm:LaunchProgram,RWKV Chat}"; Flags: nowait postinstall skipifsilent
           "@
 
-          # 将内容写入 setup.iss 文件
           $issContent | Out-File -FilePath "setup.iss" -Encoding ASCII
-
-          echo "📝 Generated setup.iss content:"
-          Get-Content setup.iss | Select-Object -First 10
-
-          # 4. 运行 Inno Setup 编译器 (ISCC)
-          echo "🚀 Running Inno Setup Compiler..."
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 
-          # 5. 验证并输出
           $installerPath = Join-Path $outputDir $installerFilename
-
           if (Test-Path $installerPath) {
-             echo "✅ Installer created successfully: $installerPath"
-             
              echo "installer_path=$installerPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-             echo "installer_name=$installerFilename" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-             echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          } else {
-             echo "😡 Installer creation failed!"
-             exit 1
-          }
-
+          } else { exit 1 }
           echo "::endgroup::"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
-          # 上传生成的 .exe 文件
+          # ✅ 修复：不生成日志
+          generate_release_notes: false
           files: ${{ steps.create-installer.outputs.installer_path }}

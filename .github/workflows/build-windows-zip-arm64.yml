@@ -38,7 +38,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 👇 关键步骤：设置 MSVC 交叉编译环境 (x64 -> arm64)
       - name: Setup MSVC for ARM64 Cross-compilation
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -53,58 +52,39 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify Flutter setup
-        run: flutter doctor -v
-
-      # 注意：有了上面的 MSVC 环境设置，这里直接 build windows 就会输出 arm64
+      # ✅ 修复：移除了 --target-platform
       - name: Build Windows ARM64
-        run: flutter build windows --release --target-platform windows-arm64
+        run: flutter build windows --release
 
       - name: Create ZIP archive
         id: create-zip
         shell: pwsh
         run: |
           echo "::group::📦 Creating ZIP Archive"
-
           $versionLine = Get-Content pubspec.yaml | Select-String "^version:"
           $version = ($versionLine -replace "version:\s*", "").Split("+")[0]
           $buildNumber = ($versionLine -replace ".*\+", "")
-
           if ([string]::IsNullOrEmpty($buildNumber)) { $buildNumber = "1" }
-          if ([string]::IsNullOrEmpty($version)) { echo "😡 Failed to extract version"; exit 1 }
 
-          # 命名格式: rwkv_chat_1.0.0_1_windows-arm64.zip
           $zipName = "rwkv_chat_${version}_${buildNumber}_windows-arm64.zip"
 
-          # ⚠️ 这里的路径依然是 build/windows/runner/Release
-          # 但是因为环境变了，里面的 exe 实际上是 arm64 的
-          # 为了保险起见，我们查看一下目录结构 (有时会在 arm64 目录下)
           if (Test-Path "build/windows/arm64/runner/Release") {
              $sourceDir = "build/windows/arm64/runner/Release"
           } else {
              $sourceDir = "build/windows/runner/Release"
           }
 
-          echo "📂 Source Dir found at: $sourceDir"
           $zipPath = "$sourceDir/../$zipName"
-
           if (-not (Test-Path $sourceDir)) { echo "😡 Source not found"; exit 1 }
-
           Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipPath -Force
-
-          # 获取绝对路径
           $fullZipPath = Resolve-Path $zipPath
-
           echo "zip_path=$fullZipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          echo "zip_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-          echo "✅ Created: $zipName"
           echo "::endgroup::"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
+          # ✅ 修复：不生成日志
+          generate_release_notes: false
           files: ${{ steps.create-zip.outputs.zip_path }}

@@ -84,6 +84,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
+          generate_release_notes: false
           # 👇 确保这里使用的是 steps.create-dmg.outputs.dmg_path
           files: ${{ steps.create-dmg.outputs.dmg_path }}

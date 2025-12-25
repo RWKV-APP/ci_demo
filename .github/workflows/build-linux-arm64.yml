@@ -5,7 +5,7 @@ run-name: ${{ github.ref_name }} Linux ARM64
 on:
   push:
     tags:
-      - '[0-9]*' # 仅在打 tag 时触发
+      - '[0-9]*'
   workflow_dispatch:
 
 concurrency:
@@ -31,72 +31,94 @@ jobs:
           path: rwkv_mobile_flutter
           fetch-depth: 1
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      # ❌ 删除了普通的 Setup Flutter，改用下面的 QEMU 模拟器
+
+      # 👇 核心步骤：启动 ARM64 模拟器环境进行构建
+      - name: 🏗️ Build in ARM64 Emulator
+        uses: uraimo/run-on-arch-action@v2
+        id: build
         with:
-          flutter-version: '3.38.5'
-          channel: 'stable'
-          cache: true
+          arch: aarch64
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
 
-      - name: Install Linux dependencies (ARM64)
+          # 1. 在容器内安装 ARM64 依赖 (注意：这里安装的是真正的 arm64 库)
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y \
+              git curl unzip xz-utils \
+              clang cmake ninja-build pkg-config \
+              libgtk-3-dev liblzma-dev
+
+          # 2. 运行构建脚本
+          run: |
+            # --- 安装 Flutter (ARM64 版本) ---
+            echo "⬇️ Downloading Flutter (ARM64)..."
+            git clone https://github.com/flutter/flutter.git --depth 1 -b stable /opt/flutter
+            export PATH="/opt/flutter/bin:$PATH"
+
+            # 解决 Git 安全目录问题
+            git config --global --add safe.directory "*"
+
+            # --- 配置依赖覆盖 ---
+            echo "🔧 Configuring overrides..."
+            echo "dependency_overrides:" > pubspec_overrides.yaml
+            echo "  rwkv_mobile_flutter:" >> pubspec_overrides.yaml
+            echo "    path: ./rwkv_mobile_flutter" >> pubspec_overrides.yaml
+
+            # --- 安装依赖并构建 ---
+            echo "🧶 Pub get..."
+            flutter pub get
+
+            echo "🏗️ Building Linux ARM64..."
+            # 在 ARM64 环境下，不需要 --target-platform 参数，直接 build 就是 arm64
+            flutter build linux --release
+
+            # --- 打包和重命名 ---
+            echo "📦 Packaging..."
+
+            # 提取版本号
+            VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+            BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+            if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
+
+            # 命名格式
+            ARCHIVE_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_linux-arm64.tar.gz"
+
+            # 进入构建目录 (注意: 这里的路径通常包含 arm64)
+            cd build/linux/arm64/release/bundle
+            tar -czf "$ARCHIVE_NAME" *
+
+            # 把打好的包移动到外层，方便 Host 机器读取
+            mv "$ARCHIVE_NAME" /artifacts/
+
+            # 将变量写入文件供 Host 读取
+            echo "archive_name=$ARCHIVE_NAME" > /artifacts/build_vars.env
+            echo "version=$VERSION" >> /artifacts/build_vars.env
+
+          # 3. 挂载目录映射
+          dockerRunArgs: |
+            --volume "${PWD}:/workspace"
+            --volume "${PWD}:/artifacts" 
+            --workdir "/workspace"
+
+      # 👇 从模拟器输出中恢复变量和文件路径
+      - name: 📤 Export Output Variables
+        id: export-vars
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            cmake \
-            ninja-build \
-            pkg-config \
-            libgtk-3-dev \
-            liblzma-dev \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu
+          # 读取容器生成的变量文件
+          cat build_vars.env >> $GITHUB_OUTPUT
 
-      - name: Override dependency path
-        run: |
-          echo "dependency_overrides:" > pubspec_overrides.yaml
-          echo "  rwkv_mobile_flutter:" >> pubspec_overrides.yaml
-          echo "    path: ./rwkv_mobile_flutter" >> pubspec_overrides.yaml
+          # 构造完整路径
+          ARCHIVE_NAME=$(grep "archive_name=" build_vars.env | cut -d= -f2)
+          echo "archive_path=$(pwd)/$ARCHIVE_NAME" >> $GITHUB_OUTPUT
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Verify Flutter setup
-        run: flutter doctor -v
-
-      - name: Build Linux ARM64
-        run: flutter build linux --release --target-platform linux-arm64
-
-      - name: 📦 Create Linux Archive
-        id: create-archive
-        run: |
-          echo "::group::📦 Creating Linux ARM64 Archive"
-
-          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
-
-          if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
-          if [ -z "$VERSION" ]; then echo "😡 Failed to extract version"; exit 1; fi
-
-          # 命名格式: rwkv_chat_1.0.0_1_linux-arm64.tar.gz
-          ARCHIVE_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_linux-arm64.tar.gz"
-
-          # 进入 bundle 目录打包
-          cd build/linux/arm64/release/bundle
-          tar -czf "$ARCHIVE_NAME" *
-
-          ARCHIVE_FULL_PATH="$(pwd)/$ARCHIVE_NAME"
-
-          echo "archive_path=$ARCHIVE_FULL_PATH" >> $GITHUB_OUTPUT
-          echo "archive_name=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-          echo "✅ Archive created: $ARCHIVE_NAME"
-          echo "::endgroup::"
+          echo "✅ Retrieved artifact: $ARCHIVE_NAME"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          generate_release_notes: true
-          files: ${{ steps.create-archive.outputs.archive_path }}
-
+          # ✅ 不生成日志
+          generate_release_notes: false
+          files: ${{ steps.export-vars.outputs.archive_path }}

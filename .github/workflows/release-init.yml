@@ -1,6 +1,6 @@
-name: 0. Initialize Release
+name: Write release notes
 
-run-name: ${{ github.ref_name }} Setup Release
+run-name: ${{ github.ref_name }} Write release notes
 
 on:
   push:

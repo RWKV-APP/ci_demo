@@ -21,6 +21,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 👇👇👇 新增：强行等待 5 秒 👇👇👇
+      - name: ⏳ Wait for 5s
+        run: |
+          echo "Waiting for 5 seconds..."
+          sleep 5
+          echo "Ready to go!"
+
       # 1. 先拉取代码，这样才能看到文件结构
       - name: 📥 Checkout
         uses: actions/checkout@v4

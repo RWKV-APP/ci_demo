@@ -1,0 +1,10 @@
+name: Dummy
+
+on:
+  push:
+    tags:
+      - '[0-9]*' # 仅在打 tag 时触发
+  workflow_dispatch:
+
+# 运行名称示例: "1.0.1 Android .apk"
+run-name: ${{ github.ref_name }}

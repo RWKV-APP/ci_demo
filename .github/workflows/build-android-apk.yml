@@ -20,7 +20,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Update run name
+      # 1. 清理空间
+      - name: 🧹 Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          tool-cache: false
+          dotnet: true
+          haskell: true
+          swap-storage: true
+          docker-images: true
+          large-packages: true
+
+      # 2. 更新运行名称
+      - name: 🏷️ Update Run Name
         uses: actions/github-script@v7
         with:
           script: |
@@ -44,20 +57,21 @@ jobs:
             const minute = parts.find(p => p.type === 'minute').value;
             const dateTime = `${month}.${day} ${hour}:${minute}`;
             const runName = `${version} ${system} ${file} ${dateTime}`;
-            
+
             await github.rest.actions.updateWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: context.runId,
               name: runName
             });
-            
-            console.log(`Updated run name to: ${runName}`);
 
-      - name: Checkout repository
+            console.log(`✅ Updated run name to: ${runName}`);
+
+      # 3. 拉取代码
+      - name: 📥 Checkout main repo
         uses: actions/checkout@v4
 
-      - name: Checkout rwkv_mobile_flutter dependency
+      - name: 📦 Checkout rwkv_mobile_flutter dependency
         uses: actions/checkout@v4
         with:
           repository: MollySophia/rwkv_mobile_flutter
@@ -65,42 +79,152 @@ jobs:
           path: rwkv_mobile_flutter
           fetch-depth: 1
 
-      - name: Setup Java
+      # 4. 环境准备 (Java + Flutter)
+      - name: ☕ Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           channel: 'stable'
           cache: true
 
-      - name: Override dependency path
+      # 5. 生成配置文件
+      - name: 📝 Generate Config Files
         run: |
+          echo "::group::🔧 Configuring Dependencies & Env"
+
+          # Override Path
           echo "dependency_overrides:" > pubspec_overrides.yaml
           echo "  rwkv_mobile_flutter:" >> pubspec_overrides.yaml
           echo "    path: ./rwkv_mobile_flutter" >> pubspec_overrides.yaml
+          echo "✅ pubspec_overrides.yaml created"
 
-      - name: Install dependencies
+          echo "::endgroup::"
+
+      # 6. 安装依赖
+      - name: 🧶 Install Dependencies
         run: flutter pub get
 
-      - name: Verify Flutter setup
-        run: flutter doctor -v
+      # 7. 验证 Flutter 环境
+      - name: 🔍 Verify Flutter Setup
+        run: |
+          echo "::group::🔍 Flutter Environment"
+          flutter doctor -v
+          echo "::endgroup::"
 
-      - name: Build APK
-        run: flutter build apk --release
+      # 8. 构建 APK
+      - name: 🏗️ Build APK (Release)
+        run: |
+          echo "::notice title=Build Started::Building release APK for Android..."
+          flutter build apk --release
 
-      # --- 以前是 upload-artifact，现在改成直接发 Release ---
+          # 显示构建结果
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          if [ -f "$APK_PATH" ]; then
+            APK_SIZE=$(ls -lh "$APK_PATH" | awk '{print $5}')
+            echo "::notice title=Build Success::APK built successfully! Size: $APK_SIZE"
+            echo "✅ APK location: $APK_PATH"
+          else
+            echo "😡 APK file not found!"
+            echo "::error title=Build Failed::APK file not found!"
+            exit 1
+          fi
 
-      - name: Create GitHub Release
+      # 9. 重命名 APK 文件
+      - name: 📝 Rename APK File
+        id: rename-apk
+        run: |
+          echo "::group::📝 Renaming APK File"
+
+          # 从 pubspec.yaml 中提取版本号和构建号
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+
+          # 如果没有构建号，使用默认值
+          if [ -z "$BUILD_NUMBER" ]; then
+            BUILD_NUMBER="1"
+            echo "🚧 Build number not found, using default: 1"
+          fi
+
+          # 验证版本号是否提取成功
+          if [ -z "$VERSION" ]; then
+            echo "😡 Failed to extract version from pubspec.yaml"
+            exit 1
+          fi
+
+          # 生成新文件名：rwkv_chat_版本号_构建号.apk
+          NEW_APK_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}.apk"
+          OLD_APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          NEW_APK_PATH="build/app/outputs/flutter-apk/${NEW_APK_NAME}"
+
+          # 检查原文件是否存在
+          if [ ! -f "$OLD_APK_PATH" ]; then
+            echo "😡 Original APK file not found: $OLD_APK_PATH"
+            exit 1
+          fi
+
+          # 重命名文件
+          mv "$OLD_APK_PATH" "$NEW_APK_PATH"
+
+          # 验证重命名是否成功
+          if [ ! -f "$NEW_APK_PATH" ]; then
+            echo "😡 Failed to rename APK file"
+            exit 1
+          fi
+
+          # 设置输出变量供后续步骤使用
+          echo "apk_path=${NEW_APK_PATH}" >> $GITHUB_OUTPUT
+          echo "apk_name=${NEW_APK_NAME}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "build_number=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
+
+          # 显示信息
+          echo "✅ APK renamed to: ${NEW_APK_NAME}"
+          echo "📦 Version: ${VERSION}"
+          echo "🔢 Build Number: ${BUILD_NUMBER}"
+
+          echo "::endgroup::"
+
+      # 10. 创建 GitHub Release 并上传 APK
+      - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          # 自动把 Release Notes 填成 Git 的提交记录（可选）
+          # 自动把 Release Notes 填成 Git 的提交记录
           generate_release_notes: true
-          # 把编译好的 APK 上传上去
-          files: build/app/outputs/flutter-apk/app-release.apk
+          # 把编译好的 APK 上传上去（使用重命名后的文件）
+          files: ${{ steps.rename-apk.outputs.apk_path }}
 
+      # 11. 生成构建摘要
+      - name: 🎉 Build Summary
+        if: success()
+        run: |
+          APK_PATH="${{ steps.rename-apk.outputs.apk_path }}"
+          APK_NAME="${{ steps.rename-apk.outputs.apk_name }}"
+          VERSION="${{ steps.rename-apk.outputs.version }}"
+          BUILD_NUMBER="${{ steps.rename-apk.outputs.build_number }}"
+
+          if [ -f "$APK_PATH" ]; then
+            APK_SIZE=$(ls -lh "$APK_PATH" | awk '{print $5}')
+          else
+            APK_SIZE="N/A"
+          fi
+
+          echo "### ✅ Release Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** Android" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** Release" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** ${BUILD_NUMBER}" >> $GITHUB_STEP_SUMMARY
+          echo "**File Name:** \`${APK_NAME}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact:** \`${APK_PATH}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Size:** ${APK_SIZE}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "✅ APK has been uploaded to GitHub Release as \`${APK_NAME}\`" >> $GITHUB_STEP_SUMMARY
+          fi

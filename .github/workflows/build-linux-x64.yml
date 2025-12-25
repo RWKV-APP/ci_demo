@@ -64,6 +64,30 @@ jobs:
       - name: Build Linux x64
         run: flutter build linux --release --target-platform linux-x64
 
+      - name: 🧹 Remove aarch64 libraries
+        run: |
+          echo "::group::🧹 Cleaning up aarch64 libraries"
+          LIB_DIR="build/linux/x64/release/bundle/lib"
+          if [ -d "$LIB_DIR" ]; then
+            # 删除 aarch64 相关的库文件
+            REMOVED_COUNT=0
+            for file in "$LIB_DIR"/*aarch64*.so "$LIB_DIR"/*arm64*.so; do
+              if [ -f "$file" ]; then
+                echo "✅ Removing: $(basename "$file")"
+                rm -f "$file"
+                REMOVED_COUNT=$((REMOVED_COUNT + 1))
+              fi
+            done
+            if [ $REMOVED_COUNT -eq 0 ]; then
+              echo "ℹ️ No aarch64 libraries found to remove"
+            else
+              echo "✅ Removed $REMOVED_COUNT aarch64 library file(s)"
+            fi
+          else
+            echo "🚧 Library directory not found: $LIB_DIR"
+          fi
+          echo "::endgroup::"
+
       - name: 📦 Create Linux Archive
         id: create-archive
         run: |

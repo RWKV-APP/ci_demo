@@ -53,11 +53,40 @@ jobs:
       - name: Build macOS app
         run: flutter build macos --release
 
-      - name: Create DMG
+      - name: 📦 Create DMG
+        id: create-dmg
         run: |
-          # 创建 DMG 文件
+          echo "::group::📦 Creating DMG"
+
+          # 1. 提取版本号
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+          if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
+
+          # 命名格式: rwkv_chat_1.0.0_1_macos-universal.dmg
+          DMG_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_macos-universal.dmg"
+
           cd build/macos/Build/Products/Release
-          hdiutil create -volname "ci_demo" -srcfolder ci_demo.app -ov -format UDZO ci_demo.dmg || true
+
+          # 2. 创建 DMG (使用提取出的名字)
+          hdiutil create -volname "RWKV_Chat" -srcfolder "ci_demo.app" -ov -format UDZO "$DMG_NAME"
+
+          DMG_PATH="$(pwd)/$DMG_NAME"
+
+          echo "dmg_path=$DMG_PATH" >> $GITHUB_OUTPUT
+          echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          echo "✅ DMG created: $DMG_NAME"
+          echo "::endgroup::"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          generate_release_notes: true
+          # 👇 确保这里使用的是 steps.create-dmg.outputs.dmg_path
+          files: ${{ steps.create-dmg.outputs.dmg_path }}
 
       # --- 以前是 upload-artifact，现在改成直接发 Release ---
 

@@ -94,21 +94,21 @@ jobs:
             exit 1
           fi
 
-      # 8. 重命名 APK 文件 (保留这个，因为对 Release 文件名很重要)
+      # 8. 重命名 APK 文件
       - name: 📝 Rename APK File
         id: rename-apk
         run: |
           echo "::group::📝 Renaming APK File"
 
-          # 提取版本信息
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
 
           if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
           if [ -z "$VERSION" ]; then echo "😡 Failed to extract version"; exit 1; fi
 
-          # 重命名
-          NEW_APK_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}.apk"
+          # 命名格式: rwkv_chat_1.0.0_1_android-universal.apk
+          NEW_APK_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_android-universal.apk"
+
           OLD_APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           NEW_APK_PATH="build/app/outputs/flutter-apk/${NEW_APK_NAME}"
 
@@ -117,7 +117,6 @@ jobs:
           echo "apk_path=${NEW_APK_PATH}" >> $GITHUB_OUTPUT
           echo "apk_name=${NEW_APK_NAME}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "build_number=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
 
           echo "✅ Renamed to: ${NEW_APK_NAME}"
           echo "::endgroup::"

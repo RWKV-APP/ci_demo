@@ -53,6 +53,19 @@ jobs:
       - name: Build iOS for TestFlight
         run: flutter build ipa --release
 
+      - name: 📝 Rename IPA
+        id: rename-ipa
+        run: |
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+
+          # 命名格式: rwkv_chat_1.0.0_1_ios-universal.ipa
+          NEW_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_ios-universal.ipa"
+
+          mv build/ios/ipa/*.ipa "build/ios/ipa/$NEW_NAME"
+
+          echo "ipa_path=build/ios/ipa/$NEW_NAME" >> $GITHUB_OUTPUT
+
       # --- 上传到 TestFlight 需要额外的配置和证书 ---
       # 这里需要配置 App Store Connect API Key 和证书
       # 可以使用 fastlane 或其他工具来上传

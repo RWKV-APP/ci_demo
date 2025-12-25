@@ -64,12 +64,32 @@ jobs:
       - name: Build Linux
         run: flutter build linux --release
 
-      - name: Create Linux archive
+      - name: 📦 Create Linux Archive
+        id: create-archive
         run: |
+          echo "::group::📦 Creating Linux Archive"
+
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+
+          if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
+          if [ -z "$VERSION" ]; then echo "😡 Failed to extract version"; exit 1; fi
+
+          # 命名格式: rwkv_chat_1.0.0_1_linux-x64.tar.gz
+          ARCHIVE_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_linux-x64.tar.gz"
+
+          # 进入 bundle 目录打包，这样解压出来直接就是文件
           cd build/linux/x64/release/bundle
-          tar -czf ci_demo-linux-x64.tar.gz *
-          cd ../../../../..
-          mv build/linux/x64/release/bundle/ci_demo-linux-x64.tar.gz build/linux/
+          tar -czf "$ARCHIVE_NAME" *
+
+          ARCHIVE_FULL_PATH="$(pwd)/$ARCHIVE_NAME"
+
+          echo "archive_path=$ARCHIVE_FULL_PATH" >> $GITHUB_OUTPUT
+          echo "archive_name=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+          echo "✅ Archive created: $ARCHIVE_NAME"
+          echo "::endgroup::"
 
       # --- 以前是 upload-artifact，现在改成直接发 Release ---
 
@@ -77,9 +97,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          # 自动把 Release Notes 填成 Git 的提交记录（可选）
           generate_release_notes: true
-          # 把编译好的 Linux 文件上传上去
-          files: |
-            build/linux/x64/release/bundle/**
-            build/linux/ci_demo-linux-x64.tar.gz
+          # 👇 这里的 files 变干净了，只上传上面生成的那个压缩包
+          files: ${{ steps.create-archive.outputs.archive_path }}

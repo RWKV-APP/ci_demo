@@ -53,9 +53,18 @@ jobs:
       - name: Build iOS for App Store
         run: flutter build ipa --release
 
-      # --- 提交到 App Store 需要额外的配置和证书 ---
-      # 这里需要配置 App Store Connect API Key 和证书
-      # 可以使用 fastlane 或其他工具来提交
+      - name: 📝 Rename IPA
+        id: rename-ipa
+        run: |
+          VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+
+          # 命名格式: rwkv_chat_1.0.0_1_ios-universal.ipa
+          NEW_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_ios-universal.ipa"
+
+          mv build/ios/ipa/*.ipa "build/ios/ipa/$NEW_NAME"
+
+          echo "ipa_path=build/ios/ipa/$NEW_NAME" >> $GITHUB_OUTPUT
 
       - name: Submit to App Store
         run: |

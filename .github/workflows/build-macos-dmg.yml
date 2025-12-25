@@ -1,4 +1,6 @@
-name: Build and Release macOS App
+name: Build and Release macOS DMG
+
+run-name: ${{ github.ref_name }} macOS .dmg
 
 on:
   push:
@@ -11,12 +13,47 @@ on:
 # 必须加上这个权限声明，否则 Action 没法创建 Release
 permissions:
   contents: write
+  actions: write
 
 jobs:
-  build-macos:
+  build-macos-dmg:
     runs-on: macos-latest
 
     steps:
+      - name: Update run name
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ github.ref_name }}';
+            const system = 'macOS';
+            const file = '.dmg';
+            // 获取当前时间（东八区）
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'Asia/Shanghai',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            });
+            const parts = formatter.formatToParts(now);
+            const month = parts.find(p => p.type === 'month').value;
+            const day = parts.find(p => p.type === 'day').value;
+            const hour = parts.find(p => p.type === 'hour').value;
+            const minute = parts.find(p => p.type === 'minute').value;
+            const dateTime = `${month}.${day} ${hour}:${minute}`;
+            const runName = `${version} ${system} ${file} ${dateTime}`;
+            
+            await github.rest.actions.updateWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              name: runName
+            });
+            
+            console.log(`Updated run name to: ${runName}`);
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -50,9 +87,9 @@ jobs:
       - name: Build macOS app
         run: flutter build macos --release
 
-      - name: Create DMG (optional)
+      - name: Create DMG
         run: |
-          # 创建 DMG 文件（可选）
+          # 创建 DMG 文件
           cd build/macos/Build/Products/Release
           hdiutil create -volname "ci_demo" -srcfolder ci_demo.app -ov -format UDZO ci_demo.dmg || true
 
@@ -64,7 +101,6 @@ jobs:
         with:
           # 自动把 Release Notes 填成 Git 的提交记录（可选）
           generate_release_notes: true
-          # 把编译好的 macOS app 上传上去
-          files: |
-            build/macos/Build/Products/Release/ci_demo.app
-            build/macos/Build/Products/Release/ci_demo.dmg
+          # 把编译好的 macOS DMG 上传上去
+          files: build/macos/Build/Products/Release/ci_demo.dmg
+

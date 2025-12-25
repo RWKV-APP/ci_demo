@@ -1,0 +1,109 @@
+name: Build and Release iOS TestFlight
+
+run-name: ${{ github.ref_name }} iOS TestFlight
+
+on:
+  push:
+    # 只有当你打的 tag 是以数字开头时（如 1.0.0, 1.1.0）才触发这个流程
+    tags:
+      - '[0-9]*'
+  # 也可以保留手动触发方便测试
+  workflow_dispatch:
+
+# 必须加上这个权限声明，否则 Action 没法创建 Release
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build-ios-testflight:
+    runs-on: macos-latest
+
+    steps:
+      - name: Update run name
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ github.ref_name }}';
+            const system = 'iOS';
+            const file = 'TestFlight';
+            // 获取当前时间（东八区）
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'Asia/Shanghai',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            });
+            const parts = formatter.formatToParts(now);
+            const month = parts.find(p => p.type === 'month').value;
+            const day = parts.find(p => p.type === 'day').value;
+            const hour = parts.find(p => p.type === 'hour').value;
+            const minute = parts.find(p => p.type === 'minute').value;
+            const dateTime = `${month}.${day} ${hour}:${minute}`;
+            const runName = `${version} ${system} ${file} ${dateTime}`;
+            
+            await github.rest.actions.updateWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              name: runName
+            });
+            
+            console.log(`Updated run name to: ${runName}`);
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout rwkv_mobile_flutter dependency
+        uses: actions/checkout@v4
+        with:
+          repository: MollySophia/rwkv_mobile_flutter
+          ref: dev
+          path: rwkv_mobile_flutter
+          fetch-depth: 1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Override dependency path
+        run: |
+          echo "dependency_overrides:" > pubspec_overrides.yaml
+          echo "  rwkv_mobile_flutter:" >> pubspec_overrides.yaml
+          echo "    path: ./rwkv_mobile_flutter" >> pubspec_overrides.yaml
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify Flutter setup
+        run: flutter doctor -v
+
+      - name: Build iOS for TestFlight
+        run: flutter build ipa --release
+
+      # --- 上传到 TestFlight 需要额外的配置和证书 ---
+      # 这里需要配置 App Store Connect API Key 和证书
+      # 可以使用 fastlane 或其他工具来上传
+
+      - name: Upload to TestFlight
+        run: |
+          # 注意：上传到 TestFlight 需要配置 App Store Connect API Key
+          # 示例：使用 fastlane 或其他工具
+          # fastlane pilot upload --ipa build/ios/ipa/ci_demo.ipa
+          echo "TestFlight upload would happen here with proper credentials"
+
+      # --- 也可以上传到 GitHub Release 作为备份 ---
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          generate_release_notes: true
+          files: build/ios/ipa/*.ipa
+

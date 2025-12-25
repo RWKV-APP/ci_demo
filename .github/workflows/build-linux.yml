@@ -1,0 +1,119 @@
+name: Build and Release Linux
+
+run-name: ${{ github.ref_name }} Linux
+
+on:
+  push:
+    # 只有当你打的 tag 是以数字开头时（如 1.0.0, 1.1.0）才触发这个流程
+    tags:
+      - '[0-9]*'
+  # 也可以保留手动触发方便测试
+  workflow_dispatch:
+
+# 必须加上这个权限声明，否则 Action 没法创建 Release
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update run name
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ github.ref_name }}';
+            const system = 'Linux';
+            // 获取当前时间（东八区）
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'Asia/Shanghai',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            });
+            const parts = formatter.formatToParts(now);
+            const month = parts.find(p => p.type === 'month').value;
+            const day = parts.find(p => p.type === 'day').value;
+            const hour = parts.find(p => p.type === 'hour').value;
+            const minute = parts.find(p => p.type === 'minute').value;
+            const dateTime = `${month}.${day} ${hour}:${minute}`;
+            const runName = `${version} ${system} ${dateTime}`;
+            
+            await github.rest.actions.updateWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              name: runName
+            });
+            
+            console.log(`Updated run name to: ${runName}`);
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout rwkv_mobile_flutter dependency
+        uses: actions/checkout@v4
+        with:
+          repository: MollySophia/rwkv_mobile_flutter
+          ref: dev
+          path: rwkv_mobile_flutter
+          fetch-depth: 1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev
+
+      - name: Override dependency path
+        run: |
+          echo "dependency_overrides:" > pubspec_overrides.yaml
+          echo "  rwkv_mobile_flutter:" >> pubspec_overrides.yaml
+          echo "    path: ./rwkv_mobile_flutter" >> pubspec_overrides.yaml
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify Flutter setup
+        run: flutter doctor -v
+
+      - name: Build Linux
+        run: flutter build linux --release
+
+      - name: Create Linux archive
+        run: |
+          cd build/linux/x64/release/bundle
+          tar -czf ci_demo-linux-x64.tar.gz *
+          cd ../../../../..
+          mv build/linux/x64/release/bundle/ci_demo-linux-x64.tar.gz build/linux/
+
+      # --- 以前是 upload-artifact，现在改成直接发 Release ---
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          # 自动把 Release Notes 填成 Git 的提交记录（可选）
+          generate_release_notes: true
+          # 把编译好的 Linux 文件上传上去
+          files: |
+            build/linux/x64/release/bundle/**
+            build/linux/ci_demo-linux-x64.tar.gz
+

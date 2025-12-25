@@ -1,0 +1,29 @@
+name: ci_demo
+description: 'A demo project for CI/CD testing'
+publish_to: 'none'
+version: 1.0.0+100
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  rwkv_mobile_flutter:
+    path: ../rwkv_mobile_flutter
+    # git:
+    #   url: https://github.com/MollySophia/rwkv_mobile_flutter
+    #   ref: dev
+
+  go_router:
+  http:
+  package_info_plus:
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

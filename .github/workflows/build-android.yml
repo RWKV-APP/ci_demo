@@ -15,6 +15,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout rwkv_mobile_flutter dependency
+        uses: actions/checkout@v4
+        with:
+          repository: MollySophia/rwkv_mobile_flutter
+          ref: dev
+          path: ../rwkv_mobile_flutter
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -27,18 +34,6 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
           cache: true
-
-      - name: Convert local dependency to git dependency
-        run: |
-          # 将本地 path 依赖替换为 git 依赖
-          # 使用 perl 来处理多行替换
-          perl -i -pe 's|path: \.\./rwkv_mobile_flutter|git:\n    url: https://github.com/MollySophia/rwkv_mobile_flutter\n    ref: dev|' pubspec.yaml
-          # 移除注释符号
-          sed -i 's|# git:|git:|g' pubspec.yaml
-          sed -i 's|#   url:|  url:|g' pubspec.yaml
-          sed -i 's|#   ref:|  ref:|g' pubspec.yaml
-          # 显示修改后的内容以便调试
-          cat pubspec.yaml | grep -A 3 "rwkv_mobile_flutter"
 
       - name: Install dependencies
         run: flutter pub get

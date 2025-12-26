@@ -184,28 +184,33 @@ jobs:
           generate_release_notes: false
           files: ${{ steps.rename-apk.outputs.apk_path }}
 
-      - name: 🛠️ Install Tencent COSCMD
+      - name: 🛠️ Setup Python
         if: startsWith(github.ref, 'refs/tags/')
-        run: pip install coscmd
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-      - name: 📤 Upload to Tencent COS
+      - name: 📦 Install dependencies
+        if: startsWith(github.ref, 'refs/tags/')
+        run: pip install huggingface_hub
+
+      - name: 📤 Upload to HuggingFace
         if: startsWith(github.ref, 'refs/tags/')
         env:
-          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
-          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
-          COS_BUCKET: ${{ secrets.COS_BUCKET }}
-          COS_REGION: ${{ secrets.COS_REGION }}
-          LOCAL_FILE: ${{ steps.rename-apk.outputs.apk_path }}
-          REMOTE_FOLDER: releases/${{ steps.rename-apk.outputs.version }}/
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_ENDPOINT: ${{ secrets.HF_ENDPOINT || 'https://hf-mirror.com' }}
+          HF_REPO_ID: ${{ secrets.HF_REPO_ID || 'rwkv-app/ci-demo-releases' }}
         run: |
-          echo "::group::📤 Uploading to Tencent COS"
-          # 配置 coscmd
-          coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "$COS_REGION"
-          # 执行上传
-          echo "Uploading $LOCAL_FILE to $REMOTE_FOLDER"
-          coscmd upload "$LOCAL_FILE" "$REMOTE_FOLDER"
+          echo "::group::📤 Uploading to HuggingFace"
+          python scripts/upload_to_hf.py \
+            --repo-id "$HF_REPO_ID" \
+            --file "${{ steps.rename-apk.outputs.apk_path }}" \
+            --path-in-repo "android-arm64/${{ steps.rename-apk.outputs.apk_name }}" \
+            --hf-token "$HF_TOKEN" \
+            --hf-endpoint "$HF_ENDPOINT"
           echo "✅ Upload completed"
           echo "::endgroup::"
+
 
       - name: 🎉 Build Summary
         if: success()

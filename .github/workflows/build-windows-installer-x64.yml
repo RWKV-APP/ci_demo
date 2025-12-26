@@ -168,7 +168,7 @@ jobs:
         shell: pwsh
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_ENDPOINT: ${{ secrets.HF_ENDPOINT || 'https://hf-mirror.com' }}
+          HF_ENDPOINT: ${{ secrets.HF_ENDPOINT || 'https://huggingface.co' }}
           HF_REPO_ID: ${{ secrets.HF_REPO_ID || 'rwkv-app/ci-demo-releases' }}
         run: |
           Write-Host "::group::📤 Uploading to HuggingFace"
@@ -182,4 +182,3 @@ jobs:
             --hf-endpoint "$env:HF_ENDPOINT"
           Write-Host "✅ Upload completed"
           Write-Host "::endgroup::"
-

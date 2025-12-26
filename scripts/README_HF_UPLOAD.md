@@ -22,10 +22,10 @@ You need to configure the following secrets in your GitHub repository:
    - Format: `username/dataset-name` or `org/dataset-name`
    - The repository must exist and you must have write access
 
-3. **`HF_ENDPOINT`** (Optional, defaults to `https://hf-mirror.com`)
+3. **`HF_ENDPOINT`** (Optional, defaults to `https://huggingface.co`)
    - HuggingFace API endpoint URL
-   - For China mainland, use: `https://hf-mirror.com`
-   - For official: `https://huggingface.co` (or leave empty)
+   - Defaults to official HuggingFace endpoint
+   - **Note:** Upload to the official endpoint - mirrors (like hf-mirror.com) will automatically sync
 
 ## How to Set Up Secrets
 
@@ -41,7 +41,7 @@ You need to configure the following secrets in your GitHub repository:
    - Value: Your repository ID (e.g., `rwkv-app/ci-demo-releases`)
 
    - Name: `HF_ENDPOINT`
-   - Value: `https://hf-mirror.com` (for China) or leave empty for official
+   - Value: Leave empty (defaults to `https://huggingface.co`) - mirrors will sync automatically
 
 ## Repository Structure
 
@@ -64,8 +64,7 @@ python scripts/upload_to_hf.py \
   --repo-id "username/dataset-name" \
   --file "path/to/file.zip" \
   --path-in-repo "category/filename.zip" \
-  --hf-token "hf_xxxxxxxxxxxx" \
-  --hf-endpoint "https://hf-mirror.com"
+  --hf-token "hf_xxxxxxxxxxxx"
 ```
 
 ## Environment Variables
@@ -79,7 +78,6 @@ Example:
 
 ```bash
 export HF_TOKEN="hf_xxxxxxxxxxxx"
-export HF_ENDPOINT="https://hf-mirror.com"
 python scripts/upload_to_hf.py --repo-id "username/dataset" --file "file.zip"
 ```
 
@@ -92,8 +90,8 @@ python scripts/upload_to_hf.py --repo-id "username/dataset" --file "file.zip"
 
 ### Upload fails with connection errors
 
-- If using a mirror, verify the `HF_ENDPOINT` is correct
-- Check network connectivity to the endpoint
+- Check network connectivity to HuggingFace
+- If needed, you can set `HF_ENDPOINT` to use a mirror, but uploads should go to the official endpoint
 
 ### Repository doesn't exist
 

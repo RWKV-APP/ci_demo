@@ -31,9 +31,10 @@ class HFUploader:
         
         Args:
             hf_token: HuggingFace token
-            hf_endpoint: HF endpoint URL (for mirror support, e.g., https://hf-mirror.com)
+            hf_endpoint: HF endpoint URL (defaults to https://huggingface.co - mirrors sync automatically)
         """
         self.hf_token = hf_token
+        # Use official HuggingFace endpoint - mirrors will sync automatically
         self.hf_endpoint = hf_endpoint or os.getenv("HF_ENDPOINT", "https://huggingface.co")
         
         # Set environment variables for downstream libraries

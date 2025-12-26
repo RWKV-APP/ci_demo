@@ -31,27 +31,35 @@ jobs:
           path: rwkv_mobile_flutter
           fetch-depth: 1
 
-      # ----------------------------------------------------------------
-      # 1. 导入证书 (新增步骤)
-      # ----------------------------------------------------------------
+      # 替换原来的 Import 步骤
       - name: 🔐 Import Code-Signing Certificates
         env:
           CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE }}
           CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
         run: |
-          # 创建临时钥匙串
-          security create-keychain -p "" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
-          security unlock-keychain -p "" build.keychain
+          # 1. 定义临时钥匙串路径 (使用 RUNNER_TEMP 更安全)
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-          # 解码并导入 p12
-          echo $CERTIFICATE_BASE64 | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          # 2. 创建并解锁新钥匙串
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
 
-          # 允许 codesign 工具访问钥匙串
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          # 3. 【关键修复】将新钥匙串加入系统搜索列表
+          # 如果没有这一步，codesign 可能找不到证书
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
 
-          # 验证导入结果
+          # 4. 导入证书
+          echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          security import certificate.p12 -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
+          # 5. 授权 codesign 访问（防止弹窗卡死）
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN_PATH"
+
+          # 6. 【调试】打印所有可用证书
+          # 请在运行失败后查看这一步的输出：
+          # 如果显示 "0 valid identities found"，说明你的 P12 文件里没有私钥，必须重新导出！
+          echo "👇 Listing identities in keychain:"
           security find-identity -v -p codesigning
 
       - name: Setup Flutter

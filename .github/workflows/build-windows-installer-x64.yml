@@ -42,33 +42,6 @@ jobs:
         shell: pwsh
         run: choco install innosetup --yes
 
-      - name: 🛠️ Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: 📦 Install image conversion dependencies
-        shell: pwsh
-        run: pip install Pillow
-
-      - name: 🎨 Convert PNG to ICO for installer icon
-        shell: pwsh
-        run: |
-          echo "::group::🎨 Converting icon"
-          python -c "
-          from PIL import Image
-          import sys
-          
-          # 读取 PNG 文件
-          img = Image.open('lib/assets/chat.png')
-          
-          # 创建 ICO 文件，包含多个尺寸（Windows 需要）
-          sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
-          img.save('installer_icon.ico', format='ICO', sizes=sizes)
-          print('✅ Icon converted to installer_icon.ico')
-          "
-          echo "::endgroup::"
-
       - name: Override dependency path
         run: |
           echo "dependency_overrides:" > pubspec_overrides.yaml
@@ -142,7 +115,6 @@ jobs:
           Compression=lzma
           SolidCompression=yes
           ArchitecturesInstallIn64BitMode=x64
-          SetupIconFile=installer_icon.ico
 
           [Languages]
           Name: "english"; MessagesFile: "compiler:Default.isl"

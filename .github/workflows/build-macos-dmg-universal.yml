@@ -1,6 +1,6 @@
 name: macOS .dmg universal
 
-run-name: ${{ github.ref_name }} macOS .dmg universal
+run-name: ${{ github.ref_name }} macOS .dmg universal + Notarization
 
 on:
   push:
@@ -31,6 +31,29 @@ jobs:
           path: rwkv_mobile_flutter
           fetch-depth: 1
 
+      # ----------------------------------------------------------------
+      # 1. 导入证书 (新增步骤)
+      # ----------------------------------------------------------------
+      - name: 🔐 Import Code-Signing Certificates
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          # 创建临时钥匙串
+          security create-keychain -p "" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          # 解码并导入 p12
+          echo $CERTIFICATE_BASE64 | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
+          # 允许 codesign 工具访问钥匙串
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+
+          # 验证导入结果
+          security find-identity -v -p codesigning
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -47,29 +70,54 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify Flutter setup
-        run: flutter doctor -v
-
       - name: Build macOS app (Universal)
         run: flutter build macos --release
 
-      - name: 📦 Create dmg
+      # ----------------------------------------------------------------
+      # 2. 签名 .app 文件 (新增步骤)
+      # 注意：必须在打包 DMG 之前对 .app 进行签名
+      # ----------------------------------------------------------------
+      - name: ✍️ Sign App Bundle
+        run: |
+          # 定义 App 路径
+          APP_PATH="build/macos/Build/Products/Release/ci_demo.app"
+
+          # 定义你的证书身份 (从你提供的证书信息中获取)
+          IDENTITY="Developer ID Application: Shenzhen Yuanshi Intelligence Co., Ltd. (3FTQ9PH6TL)"
+
+          echo "Signing $APP_PATH with identity: $IDENTITY"
+
+          # 执行签名 (开启 Hardened Runtime，这是公证必须的)
+          codesign --deep --force --verbose --options runtime --timestamp --sign "$IDENTITY" "$APP_PATH"
+
+          # 验证签名
+          codesign --verify --verbose "$APP_PATH"
+
+      # ----------------------------------------------------------------
+      # 3. 创建并签名 DMG (修改步骤)
+      # DMG 也需要签名，否则公证时可能会警告
+      # ----------------------------------------------------------------
+      - name: 📦 Create and Sign DMG
         id: create-dmg
         run: |
           echo "::group::📦 Creating dmg"
 
-          # 1. 提取版本号
           VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
           if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER="1"; fi
 
-          # 命名格式: rwkv_chat_1.0.0_1_macos-universal.dmg
           DMG_NAME="rwkv_chat_${VERSION}_${BUILD_NUMBER}_macos-universal.dmg"
 
+          # 进入 Release 目录
           cd build/macos/Build/Products/Release
 
-          # 2. 创建 dmg (使用提取出的名字)
+          # 创建 DMG
           hdiutil create -volname "RWKV_Chat" -srcfolder "ci_demo.app" -ov -format UDZO "$DMG_NAME"
+
+          # ✅ 签名 DMG 文件
+          IDENTITY="Developer ID Application: Shenzhen Yuanshi Intelligence Co., Ltd. (3FTQ9PH6TL)"
+          echo "Signing DMG..."
+          codesign --force --sign "$IDENTITY" "$DMG_NAME"
 
           DMG_PATH="$(pwd)/$DMG_NAME"
 
@@ -77,15 +125,49 @@ jobs:
           echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          echo "✅ dmg created: $DMG_NAME"
+          echo "✅ dmg created and signed: $DMG_NAME"
           echo "::endgroup::"
+
+      # ----------------------------------------------------------------
+      # 4. 提交公证 (Notarization) (新增步骤)
+      # 只有公证通过，macOS 才能在不修改安全设置的情况下打开你的 App
+      # ----------------------------------------------------------------
+      - name: 🛡️ Notarize Software
+        env:
+          # Apple ID 账号
+          APPLE_ID: ${{ secrets.APPLE_ID_EMAIL }}
+          # App 专用密码
+          APP_PASSWORD: ${{ secrets.MACOS_APP_PASSWORD }}
+          # Team ID
+          TEAM_ID: ${{ secrets.MACOS_IDENTITY_ID }}
+          # 要公证的文件
+          FILE_PATH: ${{ steps.create-dmg.outputs.dmg_path }}
+        run: |
+          echo "::group::🛡️ Notarizing..."
+
+          xcrun notarytool submit "$FILE_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APP_PASSWORD" \
+            --team-id "$TEAM_ID" \
+            --wait
+
+          echo "✅ Notarization request submitted and approved."
+          echo "::endgroup::"
+
+      # ----------------------------------------------------------------
+      # 5. 装订公证票据 (Staple) (新增步骤)
+      # 让用户离线时也能验证公证状态
+      # ----------------------------------------------------------------
+      - name: 📎 Staple Ticket
+        run: |
+          xcrun stapler staple "${{ steps.create-dmg.outputs.dmg_path }}"
+          echo "✅ Stapled notarization ticket to DMG."
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: false
-          # 👇 确保这里使用的是 steps.create-dmg.outputs.dmg_path
           files: ${{ steps.create-dmg.outputs.dmg_path }}
 
       - name: 🛠️ Install Tencent COSCMD
@@ -103,9 +185,7 @@ jobs:
           REMOTE_FOLDER: releases/${{ steps.create-dmg.outputs.version }}/
         run: |
           echo "::group::📤 Uploading to Tencent COS"
-          # 配置 coscmd
           coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "$COS_REGION"
-          # 执行上传
           echo "Uploading $LOCAL_FILE to $REMOTE_FOLDER"
           coscmd upload "$LOCAL_FILE" "$REMOTE_FOLDER"
           echo "✅ Upload completed"
